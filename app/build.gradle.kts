@@ -67,6 +67,9 @@ dependencies {
     // Solar Calculation (Corregido con la ruta directa)
     implementation("org.shredzone.commons:commons-suncalc:3.5")
 
+    // Maps - OpenStreetMap
+    implementation(libs.osmdroid)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

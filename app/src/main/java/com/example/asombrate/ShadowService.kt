@@ -21,6 +21,14 @@ interface OrsApiService {
     suspend fun geocode(
         @Query("text") text: String,
         @Query("api_key") apiKey: String,
+        @Query("size") size: Int = 5
+    ): GeocodeResponse
+
+    @GET("geocode/reverse")
+    suspend fun reverseGeocode(
+        @Query("point.lat") lat: Double,
+        @Query("point.lon") lon: Double,
+        @Query("api_key") apiKey: String,
         @Query("size") size: Int = 1
     ): GeocodeResponse
 }

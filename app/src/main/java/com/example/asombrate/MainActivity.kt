@@ -7,11 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -50,18 +47,18 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
-    var origin by remember { mutableStateOf("") }
-    var destination by remember { mutableStateOf("") }
     var departureTimeString by remember { mutableStateOf("Ahora") }
-    
+
     val uiState by viewModel.uiState.collectAsState()
+    val originState by viewModel.originState.collectAsState()
+    val destinationState by viewModel.destinationState.collectAsState()
     val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Asómbrate Debug", fontWeight = FontWeight.Bold) },
+                title = { Text("Asómbrate", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -77,31 +74,72 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            InputForm(
-                origin = origin,
-                onOriginChange = { origin = it },
-                destination = destination,
-                onDestinationChange = { destination = it },
-                departureTime = departureTimeString,
-                onTimeClick = {
-                    val calendar = Calendar.getInstance()
-                    TimePickerDialog(
-                        context,
-                        { _, hour, minute ->
-                            calendar.set(Calendar.HOUR_OF_DAY, hour)
-                            calendar.set(Calendar.MINUTE, minute)
-                            departureTimeString = String.format("%02d:%02d", hour, minute)
-                            viewModel.updateDepartureTime(calendar)
-                        },
-                        calendar.get(Calendar.HOUR_OF_DAY),
-                        calendar.get(Calendar.MINUTE),
-                        true
-                    ).show()
+            // Card con los campos de ubicación y hora
+            Card(
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    LocationPickerUI(
+                        state = originState,
+                        onQueryChanged = viewModel::onOriginQueryChanged,
+                        onSuggestionSelected = viewModel::onOriginSelected,
+                        onMapMoved = viewModel::onOriginMapMoved,
+                        onMapConfirmed = viewModel::onOriginMapConfirmed,
+                        label = "Origen",
+                        placeholder = "Ej: Bellas Artes",
+                        leadingIcon = Icons.Default.Home
+                    )
+
+                    LocationPickerUI(
+                        state = destinationState,
+                        onQueryChanged = viewModel::onDestinationQueryChanged,
+                        onSuggestionSelected = viewModel::onDestinationSelected,
+                        onMapMoved = viewModel::onDestinationMapMoved,
+                        onMapConfirmed = viewModel::onDestinationMapConfirmed,
+                        label = "Destino",
+                        placeholder = "Ej: Ángel de la Independencia",
+                        leadingIcon = Icons.Default.Search
+                    )
+
+                    OutlinedTextField(
+                        value = departureTimeString,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Hora de salida") },
+                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val calendar = Calendar.getInstance()
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        calendar.set(Calendar.HOUR_OF_DAY, hour)
+                                        calendar.set(Calendar.MINUTE, minute)
+                                        departureTimeString = String.format("%02d:%02d", hour, minute)
+                                        viewModel.updateDepartureTime(calendar)
+                                    },
+                                    calendar.get(Calendar.HOUR_OF_DAY),
+                                    calendar.get(Calendar.MINUTE),
+                                    true
+                                ).show()
+                            },
+                        enabled = false,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
                 }
-            )
+            }
 
             Button(
-                onClick = { viewModel.calculateShadow(origin, destination) },
+                onClick = { viewModel.calculateShadow() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -117,7 +155,7 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                 }
             }
 
-            // SECCIÓN DE DEBUG Y RESULTADOS
+            // Resultados y debug
             when (val state = uiState) {
                 is ShadowState.Error -> {
                     ErrorDebugCard(state.message, state.debugInfo)
@@ -147,8 +185,8 @@ fun ErrorDebugCard(message: String, debugInfo: String?) {
             if (!debugInfo.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    debugInfo, 
-                    fontSize = 12.sp, 
+                    debugInfo,
+                    fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
                 )
@@ -167,63 +205,6 @@ fun DebugInfoCard(debugInfo: String) {
             Text("Información Técnica (Debug)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Spacer(Modifier.height(4.dp))
             Text(debugInfo, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-        }
-    }
-}
-
-@Composable
-fun InputForm(
-    origin: String,
-    onOriginChange: (String) -> Unit,
-    destination: String,
-    onDestinationChange: (String) -> Unit,
-    departureTime: String,
-    onTimeClick: () -> Unit
-) {
-    Card(
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp), 
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedTextField(
-                value = origin,
-                onValueChange = onOriginChange,
-                label = { Text("Origen (Dir o long,lat)") },
-                placeholder = { Text("Ej: Bellas Artes") },
-                leadingIcon = { Icon(Icons.Default.Home, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            OutlinedTextField(
-                value = destination,
-                onValueChange = onDestinationChange,
-                label = { Text("Destino (Dir o long,lat)") },
-                placeholder = { Text("Ej: Angel de la Indep") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            OutlinedTextField(
-                value = departureTime,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Hora de salida") },
-                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onTimeClick() },
-                enabled = false,
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outline
-                )
-            )
         }
     }
 }

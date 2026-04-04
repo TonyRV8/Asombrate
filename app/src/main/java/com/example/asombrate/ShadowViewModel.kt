@@ -2,49 +2,223 @@ package com.example.asombrate
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
+data class LatLng(val lat: Double, val lng: Double)
+
+@OptIn(FlowPreview::class)
 class ShadowViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<ShadowState>(ShadowState.Idle)
     val uiState = _uiState.asStateFlow()
 
+    private val _originState = MutableStateFlow(LocationFieldState())
+    val originState = _originState.asStateFlow()
+
+    private val _destinationState = MutableStateFlow(LocationFieldState())
+    val destinationState = _destinationState.asStateFlow()
+
+    // Flows internos para debounce de texto
+    private val _originQuery = MutableStateFlow("")
+    private val _destinationQuery = MutableStateFlow("")
+
+    // Flows internos para debounce de movimiento del mapa
+    private val _originMapCenter = MutableSharedFlow<LatLng>(extraBufferCapacity = 1)
+    private val _destinationMapCenter = MutableSharedFlow<LatLng>(extraBufferCapacity = 1)
+
     private var selectedCalendar: Calendar = Calendar.getInstance()
+    private val apiKey = BuildConfig.ORS_API_KEY
+
+    init {
+        // Debounce búsqueda por texto - Origen
+        viewModelScope.launch {
+            _originQuery
+                .debounce(400)
+                .distinctUntilChanged()
+                .filter { it.length >= 3 }
+                .collect { query -> searchSuggestions(query, _originState) }
+        }
+        // Debounce búsqueda por texto - Destino
+        viewModelScope.launch {
+            _destinationQuery
+                .debounce(400)
+                .distinctUntilChanged()
+                .filter { it.length >= 3 }
+                .collect { query -> searchSuggestions(query, _destinationState) }
+        }
+        // Debounce reverse geocode - Origen (500ms)
+        viewModelScope.launch {
+            _originMapCenter
+                .debounce(500)
+                .collect { center -> reverseGeocode(center, _originState) }
+        }
+        // Debounce reverse geocode - Destino (500ms)
+        viewModelScope.launch {
+            _destinationMapCenter
+                .debounce(500)
+                .collect { center -> reverseGeocode(center, _destinationState) }
+        }
+    }
 
     fun updateDepartureTime(calendar: Calendar) {
         selectedCalendar = calendar
     }
 
-    private suspend fun getCoordinates(text: String, apiKey: String): String? {
-        val trimmed = text.trim().trim(',')
-        val clean = trimmed.replace(" ", "")
-        
-        val parts = clean.split(",").filter { it.isNotBlank() }
-        if (parts.size == 2 && parts.all { it.toDoubleOrNull() != null }) {
-            return "${parts[0]},${parts[1]}"
-        }
-        
-        return try {
-            val response = RetrofitClient.instance.geocode(text, apiKey)
-            if (response.features.isNotEmpty()) {
-                val coords = response.features[0].geometry.coordinates
-                "${coords[0]},${coords[1]}" // lng,lat
-            } else null
-        } catch (e: Exception) {
-            null
+    // --- Búsqueda por texto ---
+
+    fun onOriginQueryChanged(text: String) {
+        _originState.update { it.copy(query = text, confirmed = null) }
+        _originQuery.value = text
+    }
+
+    fun onDestinationQueryChanged(text: String) {
+        _destinationState.update { it.copy(query = text, confirmed = null) }
+        _destinationQuery.value = text
+    }
+
+    // --- Selección de sugerencia de texto → vuela el mapa ---
+
+    fun onOriginSelected(suggestion: LocationSuggestion) {
+        _originState.update {
+            it.copy(
+                query = suggestion.label,
+                confirmed = suggestion,
+                suggestions = emptyList(),
+                mapLat = suggestion.lat,
+                mapLng = suggestion.lng,
+                flyToVersion = it.flyToVersion + 1
+            )
         }
     }
 
-    fun calculateShadow(origin: String, destination: String) {
-        if (origin.isBlank() || destination.isBlank()) {
-            _uiState.value = ShadowState.Error("Falta origen o destino", "")
+    fun onDestinationSelected(suggestion: LocationSuggestion) {
+        _destinationState.update {
+            it.copy(
+                query = suggestion.label,
+                confirmed = suggestion,
+                suggestions = emptyList(),
+                mapLat = suggestion.lat,
+                mapLng = suggestion.lng,
+                flyToVersion = it.flyToVersion + 1
+            )
+        }
+    }
+
+    // --- Movimiento manual del mapa → reverse geocode ---
+
+    fun onOriginMapMoved(lat: Double, lng: Double) {
+        _originState.update {
+            it.copy(mapLat = lat, mapLng = lng, confirmed = null, isReverseGeocoding = true)
+        }
+        _originMapCenter.tryEmit(LatLng(lat, lng))
+    }
+
+    fun onDestinationMapMoved(lat: Double, lng: Double) {
+        _destinationState.update {
+            it.copy(mapLat = lat, mapLng = lng, confirmed = null, isReverseGeocoding = true)
+        }
+        _destinationMapCenter.tryEmit(LatLng(lat, lng))
+    }
+
+    // --- Confirmar ubicación desde el mapa ---
+
+    fun onOriginMapConfirmed() {
+        val s = _originState.value
+        _originState.update {
+            it.copy(
+                confirmed = LocationSuggestion(
+                    label = it.query.ifBlank { "%.5f, %.5f".format(it.mapLat, it.mapLng) },
+                    lat = it.mapLat,
+                    lng = it.mapLng
+                ),
+                suggestions = emptyList()
+            )
+        }
+    }
+
+    fun onDestinationMapConfirmed() {
+        _destinationState.update {
+            it.copy(
+                confirmed = LocationSuggestion(
+                    label = it.query.ifBlank { "%.5f, %.5f".format(it.mapLat, it.mapLng) },
+                    lat = it.mapLat,
+                    lng = it.mapLng
+                ),
+                suggestions = emptyList()
+            )
+        }
+    }
+
+    // --- Funciones internas ---
+
+    private suspend fun searchSuggestions(
+        query: String,
+        state: MutableStateFlow<LocationFieldState>
+    ) {
+        state.update { it.copy(isSearching = true) }
+        try {
+            val response = RetrofitClient.instance.geocode(query, apiKey)
+            val suggestions = response.features.map { feature ->
+                LocationSuggestion(
+                    label = feature.properties.label,
+                    lat = feature.geometry.coordinates[1],
+                    lng = feature.geometry.coordinates[0]
+                )
+            }
+            state.update { it.copy(suggestions = suggestions, isSearching = false) }
+        } catch (_: Exception) {
+            state.update { it.copy(suggestions = emptyList(), isSearching = false) }
+        }
+    }
+
+    private suspend fun reverseGeocode(
+        center: LatLng,
+        state: MutableStateFlow<LocationFieldState>
+    ) {
+        state.update { it.copy(isReverseGeocoding = true) }
+        try {
+            val response = RetrofitClient.instance.reverseGeocode(
+                lat = center.lat,
+                lon = center.lng,
+                apiKey = apiKey
+            )
+            val label = response.features.firstOrNull()?.properties?.label
+                ?: "%.5f, %.5f".format(center.lat, center.lng)
+            state.update {
+                it.copy(query = label, isReverseGeocoding = false)
+            }
+        } catch (_: Exception) {
+            state.update {
+                it.copy(
+                    query = "%.5f, %.5f".format(center.lat, center.lng),
+                    isReverseGeocoding = false
+                )
+            }
+        }
+    }
+
+    // --- Cálculo de sombra ---
+
+    fun calculateShadow() {
+        val originConfirmed = _originState.value.confirmed
+        val destinationConfirmed = _destinationState.value.confirmed
+
+        if (originConfirmed == null || destinationConfirmed == null) {
+            _uiState.value = ShadowState.Error(
+                "Confirma origen y destino antes de calcular", ""
+            )
             return
         }
 
@@ -52,33 +226,14 @@ class ShadowViewModel : ViewModel() {
             _uiState.value = ShadowState.Loading
             var debugLog = "DEBUG LOG:\n"
             try {
-                // API KEY de OpenRouteService (leída desde local.properties via BuildConfig)
-                val apiKey = BuildConfig.ORS_API_KEY
-
-                // 1. Geocoding
-                val startCoords = getCoordinates(origin, apiKey)
-                if (startCoords == null) {
-                    _uiState.value = ShadowState.Error("No se encontró Origen: $origin", debugLog)
-                    return@launch
-                }
-                debugLog += "Origen: $startCoords\n"
-
-                val endCoords = getCoordinates(destination, apiKey)
-                if (endCoords == null) {
-                    _uiState.value = ShadowState.Error("No se encontró Destino: $destination", debugLog)
-                    return@launch
-                }
-                debugLog += "Destino: $endCoords\n"
-
-                // 2. Directions POST con RouteRequest
+                debugLog += "Origen: ${originConfirmed.lng},${originConfirmed.lat}\n"
+                debugLog += "Destino: ${destinationConfirmed.lng},${destinationConfirmed.lat}\n"
                 debugLog += "Pidiendo ruta a ORS (POST)...\n"
 
-                val startParts = startCoords.split(",")
-                val endParts = endCoords.split(",")
                 val routeRequest = RouteRequest(
                     coordinates = listOf(
-                        listOf(startParts[0].toDouble(), startParts[1].toDouble()),
-                        listOf(endParts[0].toDouble(), endParts[1].toDouble())
+                        listOf(originConfirmed.lng, originConfirmed.lat),
+                        listOf(destinationConfirmed.lng, destinationConfirmed.lat)
                     )
                 )
 
@@ -92,12 +247,10 @@ class ShadowViewModel : ViewModel() {
                     return@launch
                 }
 
-                // 3. Procesamiento de la respuesta (mapeada a DirectionsResponse)
                 val routes = response.routes
                 if (!routes.isNullOrEmpty()) {
-                    val route = routes[0]
-                    val geometry = route.geometry
-                    
+                    val geometry = routes[0].geometry
+
                     if (geometry.isNullOrBlank()) {
                         _uiState.value = ShadowState.Error("Respuesta sin geometría", debugLog)
                         return@launch
@@ -105,17 +258,18 @@ class ShadowViewModel : ViewModel() {
 
                     val points = ShadowUtils.decodePolyline(geometry)
                     debugLog += "Puntos en ruta: ${points.size}\n"
-                    
+
                     var leftCount = 0
                     var rightCount = 0
                     var highSunCount = 0
 
                     for (i in 0 until points.size - 1) {
                         val start = points[i]
-                        val end = points[i+1]
+                        val end = points[i + 1]
                         val bearing = ShadowUtils.calculateBearing(start, end)
-                        val side = ShadowUtils.calculateShadowSide(bearing, start.lat, start.lng, selectedCalendar)
-
+                        val side = ShadowUtils.calculateShadowSide(
+                            bearing, start.lat, start.lng, selectedCalendar
+                        )
                         when (side) {
                             "IZQUIERDA" -> leftCount++
                             "DERECHA" -> rightCount++
@@ -125,17 +279,22 @@ class ShadowViewModel : ViewModel() {
 
                     val finalResults = mutableListOf<ShadowResult>()
                     val total = leftCount + rightCount + highSunCount
-                    
+
                     if (total > 0) {
                         val side = if (rightCount >= leftCount) "DERECHO" else "IZQUIERDO"
-                        val percent = if (rightCount >= leftCount) (rightCount * 100 / total) else (leftCount * 100 / total)
-                        
-                        finalResults.add(ShadowResult(
-                            "Siéntate del lado $side",
-                            "Tendrás sombra el $percent% del trayecto.",
-                            Icons.Default.Check,
-                            Color(0xFF4CAF50)
-                        ))
+                        val percent = if (rightCount >= leftCount) {
+                            rightCount * 100 / total
+                        } else {
+                            leftCount * 100 / total
+                        }
+                        finalResults.add(
+                            ShadowResult(
+                                "Siéntate del lado $side",
+                                "Tendrás sombra el $percent% del trayecto.",
+                                Icons.Default.Check,
+                                Color(0xFF4CAF50)
+                            )
+                        )
                     }
 
                     _uiState.value = ShadowState.Success(finalResults, debugLog)

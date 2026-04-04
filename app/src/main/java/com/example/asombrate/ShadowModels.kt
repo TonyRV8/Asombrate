@@ -49,6 +49,25 @@ data class Location(
     val lng: Double
 )
 
+// Modelo para sugerencias del autocompletado
+data class LocationSuggestion(
+    val label: String,
+    val lat: Double,
+    val lng: Double
+)
+
+// Estado de un campo de ubicación con autocompletado + mapa interactivo
+data class LocationFieldState(
+    val query: String = "",
+    val suggestions: List<LocationSuggestion> = emptyList(),
+    val confirmed: LocationSuggestion? = null,
+    val isSearching: Boolean = false,
+    val mapLat: Double = 19.4326,   // Default: CDMX centro
+    val mapLng: Double = -99.1332,
+    val isReverseGeocoding: Boolean = false,
+    val flyToVersion: Int = 0       // Se incrementa para indicar animación programática
+)
+
 sealed class ShadowState {
     object Idle : ShadowState()
     object Loading : ShadowState()
