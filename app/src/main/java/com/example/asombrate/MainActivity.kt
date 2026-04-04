@@ -1,16 +1,20 @@
 package com.example.asombrate
 
+import android.app.TimePickerDialog
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -21,47 +25,43 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.asombrate.ui.theme.AsombrateTheme
+import java.util.Calendar
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: ShadowViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             AsombrateTheme {
-                ShadowCalculatorScreen()
+                ShadowCalculatorScreen(viewModel)
             }
         }
     }
 }
 
-// Modelo de datos simulado para los resultados
-data class ShadowResult(
-    val title: String, 
-    val description: String, 
-    val icon: ImageVector, 
-    val color: Color
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShadowCalculatorScreen() {
-    // ESTADO (State Hoisting)
+fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
     var origin by remember { mutableStateOf("") }
     var destination by remember { mutableStateOf("") }
-    var departureTime by remember { mutableStateOf("04:00 PM") }
-    var results by remember { mutableStateOf<List<ShadowResult>>(emptyList()) }
-    var showResults by remember { mutableStateOf(false) }
+    var departureTimeString by remember { mutableStateOf("Ahora") }
+    
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Asómbrate", fontWeight = FontWeight.Bold) },
+                title = { Text("Asómbrate Debug", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -72,42 +72,101 @@ fun ShadowCalculatorScreen() {
             modifier = Modifier
                 .padding(innerPadding)
                 .padding(16.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // SECCIÓN DE ENTRADA
             InputForm(
                 origin = origin,
                 onOriginChange = { origin = it },
                 destination = destination,
                 onDestinationChange = { destination = it },
-                departureTime = departureTime
+                departureTime = departureTimeString,
+                onTimeClick = {
+                    val calendar = Calendar.getInstance()
+                    TimePickerDialog(
+                        context,
+                        { _, hour, minute ->
+                            calendar.set(Calendar.HOUR_OF_DAY, hour)
+                            calendar.set(Calendar.MINUTE, minute)
+                            departureTimeString = String.format("%02d:%02d", hour, minute)
+                            viewModel.updateDepartureTime(calendar)
+                        },
+                        calendar.get(Calendar.HOUR_OF_DAY),
+                        calendar.get(Calendar.MINUTE),
+                        true
+                    ).show()
+                }
             )
 
-            // BOTÓN DE ACCIÓN
             Button(
-                onClick = {
-                    results = getMockResults()
-                    showResults = true
-                },
+                onClick = { viewModel.calculateShadow(origin, destination) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = uiState !is ShadowState.Loading
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Calcular Sombra", fontSize = 18.sp)
+                if (uiState is ShadowState.Loading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Calcular Sombra", fontSize = 18.sp)
+                }
             }
 
-            // SECCIÓN DE RESULTADOS
-            AnimatedVisibility(
-                visible = showResults,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 })
-            ) {
-                ResultsSection(results)
+            // SECCIÓN DE DEBUG Y RESULTADOS
+            when (val state = uiState) {
+                is ShadowState.Error -> {
+                    ErrorDebugCard(state.message, state.debugInfo)
+                }
+                is ShadowState.Success -> {
+                    ResultsSection(state.results)
+                    DebugInfoCard(state.debugInfo)
+                }
+                else -> {}
             }
+        }
+    }
+}
+
+@Composable
+fun ErrorDebugCard(message: String, debugInfo: String?) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(8.dp))
+                Text(message, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+            }
+            if (!debugInfo.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    debugInfo, 
+                    fontSize = 12.sp, 
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DebugInfoCard(debugInfo: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Información Técnica (Debug)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(debugInfo, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
         }
     }
 }
@@ -118,7 +177,8 @@ fun InputForm(
     onOriginChange: (String) -> Unit,
     destination: String,
     onDestinationChange: (String) -> Unit,
-    departureTime: String
+    departureTime: String,
+    onTimeClick: () -> Unit
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -132,8 +192,8 @@ fun InputForm(
             OutlinedTextField(
                 value = origin,
                 onValueChange = onOriginChange,
-                label = { Text("Origen") },
-                placeholder = { Text("¿Desde dónde sales?") },
+                label = { Text("Origen (Dir o long,lat)") },
+                placeholder = { Text("Ej: Bellas Artes") },
                 leadingIcon = { Icon(Icons.Default.Home, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -142,8 +202,8 @@ fun InputForm(
             OutlinedTextField(
                 value = destination,
                 onValueChange = onDestinationChange,
-                label = { Text("Destino") },
-                placeholder = { Text("¿A dónde vas?") },
+                label = { Text("Destino (Dir o long,lat)") },
+                placeholder = { Text("Ej: Angel de la Indep") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -155,7 +215,14 @@ fun InputForm(
                 readOnly = true,
                 label = { Text("Hora de salida") },
                 leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onTimeClick() },
+                enabled = false,
+                colors = OutlinedTextFieldDefaults.colors(
+                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline
+                )
             )
         }
     }
@@ -170,14 +237,8 @@ fun ResultsSection(results: List<ShadowResult>) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(vertical = 8.dp)
         )
-        
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(results) { result ->
-                ResultCard(result)
-            }
+        results.forEach { result ->
+            ResultCard(result)
         }
     }
 }
@@ -212,21 +273,4 @@ fun ResultCard(result: ShadowResult) {
             }
         }
     }
-}
-
-fun getMockResults(): List<ShadowResult> {
-    return listOf(
-        ShadowResult(
-            "Siéntate del lado derecho",
-            "Es el lado con mayor sombra durante el trayecto.",
-            Icons.Default.Check,
-            Color(0xFF4CAF50)
-        ),
-        ShadowResult(
-            "Riesgo solar alto",
-            "Entre 4:20 y 4:45 pm el sol pegará de frente.",
-            Icons.Default.Info,
-            Color(0xFFFF9800)
-        )
-    )
 }
