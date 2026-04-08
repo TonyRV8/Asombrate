@@ -136,9 +136,11 @@ object ShadowCalculation {
         val total = profile.totalDistanceMeters
         val coverageRatio =
             if (total > 0.0) (profile.validDistanceMeters / total).coerceIn(0.0, 1.0) else 0.0
-        val confidence =
-            if (isFallback) RecommendationConfidence.LOW
-            else confidenceFor(profile)
+        val confidence = when {
+            total <= 0.0 || profile.validDistanceMeters <= 0.0 -> RecommendationConfidence.NONE
+            isFallback -> RecommendationConfidence.LOW
+            else -> confidenceFor(profile)
+        }
 
         return RecommendationExplanation(
             recommendedSeatId = recId,
@@ -159,16 +161,18 @@ object ShadowCalculation {
         val recSeat =
             busRec?.seatResult?.plan?.seats?.firstOrNull { it.id == busRec.seatResult.recommendedSeatId }
         val title = if (recSeat != null) {
-            "Siéntate en ${SeatIds.readable(recSeat)}"
+            UiText(R.string.result_title_seat, listOf(SeatIds.readable(recSeat)))
         } else {
-            "Siéntate del lado $shadySide"
+            UiText(R.string.result_title_side, listOf(shadySide))
         }
         val desc = if (recSeat != null) {
             val pct = (recSeat.exposure * 100).toInt()
-            "Asiento con menor exposición al sol (${pct}%). " +
-                "Lado $shadySide sombreado en $shadePercent% del trayecto."
+            UiText(
+                R.string.result_desc_seat,
+                listOf(pct, shadySide, shadePercent)
+            )
         } else {
-            "Tendrás sombra el $shadePercent% del trayecto."
+            UiText(R.string.result_desc_side, listOf(shadePercent))
         }
         return listOf(ShadowResult(title, desc, Icons.Default.Check, Color(0xFF4CAF50)))
     }

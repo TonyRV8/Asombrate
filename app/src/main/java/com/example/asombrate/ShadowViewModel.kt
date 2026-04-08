@@ -1,6 +1,7 @@
 package com.example.asombrate
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -16,7 +17,13 @@ import java.util.Calendar
 data class LatLng(val lat: Double, val lng: Double)
 
 @OptIn(FlowPreview::class)
-class ShadowViewModel : ViewModel() {
+class ShadowViewModel(
+    private val savedStateHandle: SavedStateHandle
+) : ViewModel() {
+
+    companion object {
+        private const val KEY_SELECTED_VEHICLE = "selected_vehicle"
+    }
 
     private val _uiState = MutableStateFlow<ShadowState>(ShadowState.Idle)
     val uiState = _uiState.asStateFlow()
@@ -28,7 +35,11 @@ class ShadowViewModel : ViewModel() {
     val destinationState = _destinationState.asStateFlow()
 
     /** Vehículo seleccionado por UI — vive en VM para que Success sea SSOT. */
-    private val _selectedVehicle = MutableStateFlow(VehicleType.BUS)
+    private val _selectedVehicle = MutableStateFlow(
+        VehicleType.entries.firstOrNull {
+            it.name == savedStateHandle.get<String>(KEY_SELECTED_VEHICLE)
+        } ?: VehicleType.BUS
+    )
     val selectedVehicle = _selectedVehicle.asStateFlow()
 
     // Flows internos para debounce de texto
@@ -42,6 +53,10 @@ class ShadowViewModel : ViewModel() {
     // Fase 2: cache TTL para reducir llamadas redundantes
     private val geocodeCache = TtlCache<String, List<LocationSuggestion>>(ttlMillis = 5 * 60_000L)
     private val reverseGeocodeCache = TtlCache<String, String>(ttlMillis = 5 * 60_000L)
+    private val directionsCache = TtlCache<String, List<Location>>(
+        ttlMillis = 2 * 60_000L,
+        maxEntries = 32
+    )
 
     // Último punto consultado por reverse para evitar micro-movimientos.
     private var lastOriginReverseAt: LatLng? = null
@@ -102,6 +117,7 @@ class ShadowViewModel : ViewModel() {
 
     fun selectVehicle(type: VehicleType) {
         _selectedVehicle.value = type
+        savedStateHandle[KEY_SELECTED_VEHICLE] = type.name
     }
 
     // --- Búsqueda por texto ---
@@ -262,7 +278,8 @@ class ShadowViewModel : ViewModel() {
 
         if (originConfirmed == null || destinationConfirmed == null) {
             _uiState.value = ShadowState.Error(
-                "Confirma origen y destino antes de calcular", ""
+                UiText(R.string.error_confirm_before_calc),
+                ""
             )
             return
         }
@@ -273,44 +290,54 @@ class ShadowViewModel : ViewModel() {
             try {
                 debugLog += "Origen: ${originConfirmed.lng},${originConfirmed.lat}\n"
                 debugLog += "Destino: ${destinationConfirmed.lng},${destinationConfirmed.lat}\n"
-                debugLog += "Pidiendo ruta a ORS (POST)...\n"
+                val routeKey = buildDirectionsCacheKey(originConfirmed, destinationConfirmed, selectedCalendar)
+                val cachedPoints = directionsCache.get(routeKey)
+                val points = if (cachedPoints != null) {
+                    debugLog += "Ruta cache: HIT\n"
+                    cachedPoints
+                } else run {
+                    debugLog += "Ruta cache: MISS\n"
+                    debugLog += "Pidiendo ruta a ORS (POST)...\n"
 
-                val routeRequest = RouteRequest(
-                    coordinates = listOf(
-                        listOf(originConfirmed.lng, originConfirmed.lat),
-                        listOf(destinationConfirmed.lng, destinationConfirmed.lat)
-                    )
-                )
-
-                val response = try {
-                    retryingCall {
-                        RetrofitClient.instance.getDirections(
-                            apiKey = apiKey,
-                            request = routeRequest
+                    val routeRequest = RouteRequest(
+                        coordinates = listOf(
+                            listOf(originConfirmed.lng, originConfirmed.lat),
+                            listOf(destinationConfirmed.lng, destinationConfirmed.lat)
                         )
-                    }
-                } catch (e: Exception) {
-                    val err = NetworkErrorClassifier.classify(e)
-                    _uiState.value = ShadowState.Error(
-                        err.userMessage,
-                        debugLog + err.debugDetail
                     )
-                    return@launch
-                }
 
-                val routes = response.routes
-                if (routes.isNullOrEmpty()) {
-                    _uiState.value = ShadowState.Error("No se encontró ruta", debugLog)
-                    return@launch
-                }
+                    val response = try {
+                        retryingCall {
+                            RetrofitClient.instance.getDirections(
+                                apiKey = apiKey,
+                                request = routeRequest
+                            )
+                        }
+                    } catch (e: Exception) {
+                        val err = NetworkErrorClassifier.classify(e)
+                        _uiState.value = ShadowState.Error(
+                            err.userMessage,
+                            debugLog + err.debugDetail
+                        )
+                        return@launch
+                    }
 
-                val geometry = routes[0].geometry
-                if (geometry.isNullOrBlank()) {
-                    _uiState.value = ShadowState.Error("Respuesta sin geometría", debugLog)
-                    return@launch
-                }
+                    val routes = response.routes
+                    if (routes.isNullOrEmpty()) {
+                        _uiState.value = ShadowState.Error(UiText(R.string.error_no_route), debugLog)
+                        return@launch
+                    }
 
-                val points = ShadowUtils.decodePolyline(geometry)
+                    val geometry = routes[0].geometry
+                    if (geometry.isNullOrBlank()) {
+                        _uiState.value = ShadowState.Error(UiText(R.string.error_no_geometry), debugLog)
+                        return@launch
+                    }
+
+                    val decoded = ShadowUtils.decodePolyline(geometry)
+                    directionsCache.put(routeKey, decoded)
+                    decoded
+                }
                 debugLog += "Puntos en ruta: ${points.size}\n"
 
                 _uiState.value = ShadowCalculation.buildSuccess(
@@ -326,5 +353,21 @@ class ShadowViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    private fun buildDirectionsCacheKey(
+        origin: LocationSuggestion,
+        destination: LocationSuggestion,
+        calendar: Calendar
+    ): String {
+        return String.format(
+            "%.5f,%.5f|%.5f,%.5f|%02d:%02d",
+            origin.lat,
+            origin.lng,
+            destination.lat,
+            destination.lng,
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE)
+        )
     }
 }

@@ -196,7 +196,16 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
 }
 
 @Composable
-fun ErrorDebugCard(message: String, debugInfo: String?) {
+private fun resolveUiText(text: UiText): String {
+    return if (text.formatArgs.isEmpty()) {
+        stringResource(text.resId)
+    } else {
+        stringResource(text.resId, *text.formatArgs.toTypedArray())
+    }
+}
+
+@Composable
+fun ErrorDebugCard(message: UiText, debugInfo: String?) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
         modifier = Modifier.fillMaxWidth()
@@ -205,7 +214,11 @@ fun ErrorDebugCard(message: String, debugInfo: String?) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.width(8.dp))
-                Text(message, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                Text(
+                    resolveUiText(message),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
             }
             if (!debugInfo.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
@@ -314,7 +327,7 @@ fun SeatMapSection(
                 if (plan != null) {
                     val mapDesc = stringResource(
                         R.string.a11y_seat_map_region,
-                        selectedVehicle.label
+                        stringResource(selectedVehicle.labelRes)
                     )
                     SeatMap(
                         plan = plan,
@@ -564,8 +577,12 @@ fun ResultCard(result: ShadowResult) {
             }
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(result.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                Text(result.description, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    resolveUiText(result.title),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(resolveUiText(result.description), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

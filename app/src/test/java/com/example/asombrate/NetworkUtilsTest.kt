@@ -62,7 +62,7 @@ class NetworkErrorClassifierTest {
         val t = SocketTimeoutException("boom")
         val err = NetworkErrorClassifier.classify(t)
         assertTrue(NetworkErrorClassifier.isTransient(t))
-        assertTrue(err.userMessage.contains("Tiempo", ignoreCase = true))
+        assertEquals(R.string.error_timeout, err.userMessage.resId)
     }
 
     @Test
@@ -70,14 +70,14 @@ class NetworkErrorClassifierTest {
         val t = UnknownHostException("no dns")
         assertFalse(NetworkErrorClassifier.isTransient(t))
         val err = NetworkErrorClassifier.classify(t)
-        assertTrue(err.userMessage.contains("conexión", ignoreCase = true))
+        assertEquals(R.string.error_no_connection, err.userMessage.resId)
     }
 
     @Test
     fun `429 es transitorio y mensaje menciona rate limit`() {
         val e = httpException(429)
         assertTrue(NetworkErrorClassifier.isTransient(e))
-        assertTrue(NetworkErrorClassifier.classify(e).userMessage.contains("solicitudes", ignoreCase = true))
+        assertEquals(R.string.error_rate_limit, NetworkErrorClassifier.classify(e).userMessage.resId)
     }
 
     @Test
@@ -90,7 +90,7 @@ class NetworkErrorClassifierTest {
     fun `401 NO es transitorio`() {
         val e = httpException(401)
         assertFalse(NetworkErrorClassifier.isTransient(e))
-        assertTrue(NetworkErrorClassifier.classify(e).userMessage.contains("API", ignoreCase = true))
+        assertEquals(R.string.error_auth_api_key, NetworkErrorClassifier.classify(e).userMessage.resId)
     }
 }
 

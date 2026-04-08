@@ -2,12 +2,18 @@ package com.example.asombrate
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.annotation.StringRes
 import com.google.gson.annotations.SerializedName
+
+data class UiText(
+    @StringRes val resId: Int,
+    val formatArgs: List<Any> = emptyList()
+)
 
 // Modelo para los resultados de sombra
 data class ShadowResult(
-    val title: String,
-    val description: String,
+    val title: UiText,
+    val description: UiText,
     val icon: ImageVector,
     val color: Color
 )
@@ -107,7 +113,7 @@ sealed class ShadowState {
         val recommendations: Map<VehicleType, VehicleRecommendation> = emptyMap()
     ) : ShadowState()
     data class Error(
-        val message: String,
+        val message: UiText,
         val debugInfo: String? = null
     ) : ShadowState()
 }

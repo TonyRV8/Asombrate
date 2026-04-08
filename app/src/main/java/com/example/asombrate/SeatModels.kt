@@ -7,11 +7,11 @@ enum class SeatState { SUN, SHADE, PARTIAL, NEUTRAL, SELECTED }
 enum class VehicleType(
     val rows: Int,
     val cols: Int,
-    val label: String,
+    val labelRes: Int,
     val aisleAfterCol: Int?
 ) {
-    CAR(rows = 2, cols = 2, label = "Auto", aisleAfterCol = null),
-    BUS(rows = 10, cols = 4, label = "Autobús", aisleAfterCol = 2)
+    CAR(rows = 2, cols = 2, labelRes = R.string.vehicle_car, aisleAfterCol = null),
+    BUS(rows = 10, cols = 4, labelRes = R.string.vehicle_bus, aisleAfterCol = 2)
 }
 
 data class Seat(

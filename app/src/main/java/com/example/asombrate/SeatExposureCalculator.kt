@@ -24,6 +24,15 @@ data class SeatExposureResult(
     val metrics: String
 )
 
+data class SeatExposureConfig(
+    val windowSunFactor: Double = 1.0,
+    val interiorSunFactor: Double = 0.55,
+    val overheadFactor: Double = 0.40,
+    val sunThreshold: Double = 0.65,
+    val partialThreshold: Double = 0.30,
+    val tieBucket: Double = 0.02
+)
+
 /**
  * Calculador real de exposición solar por asiento.
  *
@@ -36,15 +45,7 @@ data class SeatExposureResult(
  */
 object SeatExposureCalculator {
 
-    private const val WINDOW_SUN_FACTOR = 1.0
-    private const val INTERIOR_SUN_FACTOR = 0.55
-    private const val OVERHEAD_FACTOR = 0.40
-
-    private const val SUN_THRESHOLD = 0.65
-    private const val PARTIAL_THRESHOLD = 0.30
-
-    /** Bucket para considerar dos scores "similares" en el desempate. */
-    private const val TIE_BUCKET = 0.02
+    private val defaultConfig = SeatExposureConfig()
 
     fun computeProfile(
         points: List<Location>,
@@ -82,7 +83,8 @@ object SeatExposureCalculator {
 
     fun buildPlan(
         profile: RouteSolarProfile,
-        vehicleType: VehicleType
+        vehicleType: VehicleType,
+        config: SeatExposureConfig = defaultConfig
     ): SeatExposureResult {
         val denom = profile.totalDistanceMeters
         if (profile.segments.isEmpty() || denom <= 0.0 || profile.validDistanceMeters <= 0.0) {
@@ -96,12 +98,12 @@ object SeatExposureCalculator {
                 val isWindow = col == 1 || col == vehicleType.cols
                 var weighted = 0.0
                 for (seg in profile.segments) {
-                    weighted += seg.distanceMeters * sunFactor(seg.shadeSide, isLeft, isWindow)
+                    weighted += seg.distanceMeters * sunFactor(seg.shadeSide, isLeft, isWindow, config)
                 }
                 val exposure = (weighted / denom).coerceIn(0.0, 1.0)
                 val state = when {
-                    exposure >= SUN_THRESHOLD -> SeatState.SUN
-                    exposure >= PARTIAL_THRESHOLD -> SeatState.PARTIAL
+                    exposure >= config.sunThreshold -> SeatState.SUN
+                    exposure >= config.partialThreshold -> SeatState.PARTIAL
                     else -> SeatState.SHADE
                 }
                 seats.add(
@@ -117,7 +119,7 @@ object SeatExposureCalculator {
             }
         }
 
-        val ranked = rankSeats(seats, vehicleType)
+        val ranked = rankSeats(seats, vehicleType, config.tieBucket)
         val recommended = ranked.firstOrNull()
         val alternatives = ranked.drop(1).take(3).map { it.id }
 
@@ -151,38 +153,64 @@ object SeatExposureCalculator {
                 { windowRank(it.col, vehicleType) }
             )
         )
-        val rec = ranked.firstOrNull { it.state != SeatState.NEUTRAL } ?: ranked.firstOrNull()
-        val alts = ranked.filter { it.id != rec?.id }.take(3).map { it.id }
+        val hasSignal = !shadySide.isNullOrBlank() && shadePercent > 0
+        val rec = if (hasSignal) {
+            ranked.firstOrNull { it.state != SeatState.NEUTRAL }
+        } else {
+            null
+        }
+        val alts = if (rec != null) {
+            ranked
+                .filter { it.id != rec.id && it.state != SeatState.NEUTRAL }
+                .take(3)
+                .map { it.id }
+        } else {
+            emptyList()
+        }
         return SeatExposureResult(
             plan = plan,
             recommendedSeatId = rec?.id,
             alternatives = alts,
-            metrics = "fallback lado=$shadySide pct=$shadePercent"
+            metrics = if (hasSignal) {
+                "fallback lado=$shadySide pct=$shadePercent"
+            } else {
+                "fallback sin señal suficiente"
+            }
         )
     }
 
     // --- helpers ---
 
-    private fun sunFactor(shade: ShadeSide, isLeft: Boolean, isWindow: Boolean): Double {
+    private fun sunFactor(
+        shade: ShadeSide,
+        isLeft: Boolean,
+        isWindow: Boolean,
+        config: SeatExposureConfig
+    ): Double {
         return when (shade) {
             ShadeSide.NONE -> 0.0
-            ShadeSide.OVERHEAD -> OVERHEAD_FACTOR
+            ShadeSide.OVERHEAD -> config.overheadFactor
             ShadeSide.LEFT -> {
                 // Sombra en izquierda: derecha expuesta
                 if (isLeft) 0.0
-                else if (isWindow) WINDOW_SUN_FACTOR else INTERIOR_SUN_FACTOR
+                else if (isWindow) config.windowSunFactor else config.interiorSunFactor
             }
             ShadeSide.RIGHT -> {
                 // Sombra en derecha: izquierda expuesta
                 if (!isLeft) 0.0
-                else if (isWindow) WINDOW_SUN_FACTOR else INTERIOR_SUN_FACTOR
+                else if (isWindow) config.windowSunFactor else config.interiorSunFactor
             }
         }
     }
 
-    private fun rankSeats(seats: List<Seat>, vehicleType: VehicleType): List<Seat> {
+    private fun rankSeats(
+        seats: List<Seat>,
+        vehicleType: VehicleType,
+        tieBucket: Double
+    ): List<Seat> {
+        val bucket = if (tieBucket > 0.0) tieBucket else 0.02
         return seats.sortedWith(
-            compareBy<Seat> { (it.score / TIE_BUCKET).toInt() }   // primario: score (bucket)
+            compareBy<Seat> { (it.score / bucket).toInt() }       // primario: score (bucket)
                 .thenBy { it.row }                                // desempate 1: frente
                 .thenBy { windowRank(it.col, vehicleType) }       // desempate 2: interior > ventana
                 .thenBy { it.score }                              // desempate final: score exacto

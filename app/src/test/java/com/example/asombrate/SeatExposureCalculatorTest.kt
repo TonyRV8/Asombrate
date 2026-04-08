@@ -134,4 +134,41 @@ class SeatExposureCalculatorTest {
         val rec = result.plan.seats.first { it.id == result.recommendedSeatId }
         assertTrue("fallback debe recomendar asiento lado derecho", rec.col >= 3)
     }
+
+    @Test
+    fun `fallbackPlan sin señal no recomienda asiento`() {
+        val result = SeatExposureCalculator.fallbackPlan(
+            vehicleType = VehicleType.BUS,
+            shadySide = null,
+            shadePercent = 0
+        )
+        assertEquals(null, result.recommendedSeatId)
+        assertTrue(result.alternatives.isEmpty())
+        assertTrue(result.plan.seats.all { it.state == SeatState.NEUTRAL })
+    }
+
+    @Test
+    fun `buildPlan permite ajustar umbrales por configuracion`() {
+        val p = profile(1000.0 to ShadeSide.RIGHT)
+
+        val defaultPlan = SeatExposureCalculator.buildPlan(p, VehicleType.BUS)
+        val seatDefault = defaultPlan.plan.seats.first { it.id == "1A" }
+        assertEquals(SeatState.SUN, seatDefault.state)
+
+        val customConfig = SeatExposureConfig(
+            windowSunFactor = 0.60,
+            interiorSunFactor = 0.35,
+            overheadFactor = 0.25,
+            sunThreshold = 0.75,
+            partialThreshold = 0.40,
+            tieBucket = 0.05
+        )
+        val customPlan = SeatExposureCalculator.buildPlan(
+            profile = p,
+            vehicleType = VehicleType.BUS,
+            config = customConfig
+        )
+        val seatCustom = customPlan.plan.seats.first { it.id == "1A" }
+        assertEquals(SeatState.PARTIAL, seatCustom.state)
+    }
 }

@@ -53,7 +53,7 @@ class TtlCache<K, V>(
 }
 
 /** Mensaje para el usuario + detalle de debug. */
-data class UserError(val userMessage: String, val debugDetail: String)
+data class UserError(val userMessage: UiText, val debugDetail: String)
 
 /**
  * Clasificador puro de excepciones de red en mensajes entendibles.
@@ -64,20 +64,20 @@ object NetworkErrorClassifier {
     fun classify(t: Throwable): UserError {
         return when (t) {
             is SocketTimeoutException -> UserError(
-                "Tiempo de espera agotado al consultar la ruta. Intenta de nuevo.",
+                UiText(R.string.error_timeout),
                 "Timeout: ${t.message}"
             )
             is UnknownHostException -> UserError(
-                "Sin conexión a Internet o servicio no disponible.",
+                UiText(R.string.error_no_connection),
                 "UnknownHost: ${t.message}"
             )
             is HttpException -> classifyHttp(t)
             is IOException -> UserError(
-                "Problema de red. Revisa tu conexión e inténtalo de nuevo.",
+                UiText(R.string.error_network_generic),
                 "IO: ${t.message}"
             )
             else -> UserError(
-                "Ocurrió un error inesperado al calcular la ruta.",
+                UiText(R.string.error_unexpected),
                 "${t::class.java.simpleName}: ${t.message}"
             )
         }
@@ -86,12 +86,12 @@ object NetworkErrorClassifier {
     fun classifyHttp(e: HttpException): UserError {
         val code = e.code()
         val msg = when (code) {
-            401, 403 -> "API key inválida o sin permisos para este servicio."
-            404 -> "No se encontró información para esa ubicación."
-            408 -> "El servidor tardó demasiado en responder."
-            429 -> "Demasiadas solicitudes al servidor. Espera unos segundos e inténtalo de nuevo."
-            in 500..599 -> "El servicio de rutas está teniendo problemas. Intenta más tarde."
-            else -> "Error del servicio ($code)."
+            401, 403 -> UiText(R.string.error_auth_api_key)
+            404 -> UiText(R.string.error_not_found)
+            408 -> UiText(R.string.error_http_timeout)
+            429 -> UiText(R.string.error_rate_limit)
+            in 500..599 -> UiText(R.string.error_server_5xx)
+            else -> UiText(R.string.error_service_generic, listOf(code))
         }
         return UserError(msg, "HTTP $code: ${e.message()}")
     }

@@ -96,7 +96,7 @@ fun VehicleTypeSelector(
             FilterChip(
                 selected = type == current,
                 onClick = { onSelected(type) },
-                label = { Text(type.label) },
+                label = { Text(stringResource(type.labelRes)) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
                 )

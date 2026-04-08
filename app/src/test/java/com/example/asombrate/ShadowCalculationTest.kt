@@ -87,6 +87,6 @@ class ShadowCalculationTest {
         assertNull(success.shadySide)
         val busExp = success.recommendations[VehicleType.BUS]!!.explanation
         assertTrue(busExp.isFallback)
-        assertEquals(RecommendationConfidence.LOW, busExp.confidence)
+        assertEquals(RecommendationConfidence.NONE, busExp.confidence)
     }
 }

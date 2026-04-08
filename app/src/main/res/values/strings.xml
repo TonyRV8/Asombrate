@@ -9,6 +9,8 @@
     <string name="label_departure_time">Hora de salida</string>
     <string name="departure_now">Ahora</string>
     <string name="btn_calculate_shadow">Calcular Sombra</string>
+    <string name="vehicle_car">Auto</string>
+    <string name="vehicle_bus">Autobús</string>
 
     <!-- Mapa -->
     <string name="map_center_pin_desc">Pin al centro del mapa</string>
@@ -21,6 +23,10 @@
     <string name="section_seat_map">Plano de asientos</string>
     <string name="section_alternatives">Alternativas</string>
     <string name="debug_section_title">Información Técnica (Debug)</string>
+    <string name="result_title_seat">Siéntate en %1$s</string>
+    <string name="result_title_side">Siéntate del lado %1$s</string>
+    <string name="result_desc_seat">Asiento con menor exposición al sol (%1$d%%). Lado %2$s sombreado en %3$d%% del trayecto.</string>
+    <string name="result_desc_side">Tendrás sombra el %1$d%% del trayecto.</string>
 
     <!-- Recomendación -->
     <string name="recommended_seat_format">Recomendado: %1$s</string>
@@ -41,6 +47,18 @@
 
     <!-- Errores -->
     <string name="error_confirm_before_calc">Confirma origen y destino antes de calcular</string>
+    <string name="error_no_route">No se encontró ruta</string>
+    <string name="error_no_geometry">Respuesta sin geometría</string>
+    <string name="error_timeout">Tiempo de espera agotado al consultar la ruta. Intenta de nuevo.</string>
+    <string name="error_no_connection">Sin conexión a Internet o servicio no disponible.</string>
+    <string name="error_network_generic">Problema de red. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="error_unexpected">Ocurrió un error inesperado al calcular la ruta.</string>
+    <string name="error_auth_api_key">API key inválida o sin permisos para este servicio.</string>
+    <string name="error_not_found">No se encontró información para esa ubicación.</string>
+    <string name="error_http_timeout">El servidor tardó demasiado en responder.</string>
+    <string name="error_rate_limit">Demasiadas solicitudes al servidor. Espera unos segundos e inténtalo de nuevo.</string>
+    <string name="error_server_5xx">El servicio de rutas está teniendo problemas. Intenta más tarde.</string>
+    <string name="error_service_generic">Error del servicio (%1$d).</string>
 
     <!-- Accesibilidad -->
     <string name="a11y_seat_map_region">Plano de asientos del %1$s. Toca un asiento para seleccionarlo.</string>
