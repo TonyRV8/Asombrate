@@ -27,6 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,18 +55,26 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
-    var departureTimeString by remember { mutableStateOf("Ahora") }
+    val defaultDeparture = stringResource(R.string.departure_now)
+    var departureTimeString by remember { mutableStateOf(defaultDeparture) }
 
     val uiState by viewModel.uiState.collectAsState()
     val originState by viewModel.originState.collectAsState()
     val destinationState by viewModel.destinationState.collectAsState()
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Asómbrate", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        stringResource(R.string.app_name),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { heading() }
+                    )
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -94,8 +106,8 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                         onSuggestionSelected = viewModel::onOriginSelected,
                         onMapMoved = viewModel::onOriginMapMoved,
                         onMapConfirmed = viewModel::onOriginMapConfirmed,
-                        label = "Origen",
-                        placeholder = "Ej: Bellas Artes",
+                        label = stringResource(R.string.label_origin),
+                        placeholder = stringResource(R.string.placeholder_origin),
                         leadingIcon = Icons.Default.Home
                     )
 
@@ -105,8 +117,8 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                         onSuggestionSelected = viewModel::onDestinationSelected,
                         onMapMoved = viewModel::onDestinationMapMoved,
                         onMapConfirmed = viewModel::onDestinationMapConfirmed,
-                        label = "Destino",
-                        placeholder = "Ej: Ángel de la Independencia",
+                        label = stringResource(R.string.label_destination),
+                        placeholder = stringResource(R.string.placeholder_destination),
                         leadingIcon = Icons.Default.Search
                     )
 
@@ -114,10 +126,11 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                         value = departureTimeString,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Hora de salida") },
+                        label = { Text(stringResource(R.string.label_departure_time)) },
                         leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = 56.dp)
                             .clickable {
                                 val calendar = Calendar.getInstance()
                                 TimePickerDialog(
@@ -142,11 +155,13 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                 }
             }
 
+            val calcA11y = stringResource(R.string.a11y_calculate_button)
             Button(
                 onClick = { viewModel.calculateShadow() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .heightIn(min = 56.dp)
+                    .semantics { contentDescription = calcA11y },
                 shape = RoundedCornerShape(12.dp),
                 enabled = uiState !is ShadowState.Loading
             ) {
@@ -155,7 +170,7 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                 } else {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Calcular Sombra", fontSize = 18.sp)
+                    Text(stringResource(R.string.btn_calculate_shadow), fontSize = 18.sp)
                 }
             }
 
@@ -167,9 +182,10 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                 is ShadowState.Success -> {
                     ResultsSection(state.results)
                     SeatMapSection(
-                        routeProfile = state.routeProfile,
+                        recommendations = state.recommendations,
                         shadySide = state.shadySide,
-                        shadePercent = state.shadePercent
+                        selectedVehicle = selectedVehicle,
+                        onVehicleSelected = viewModel::selectVehicle
                     )
                     DebugInfoCard(state.debugInfo)
                 }
@@ -211,7 +227,11 @@ fun DebugInfoCard(debugInfo: String) {
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Información Técnica (Debug)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(
+                stringResource(R.string.debug_section_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
+            )
             Spacer(Modifier.height(4.dp))
             Text(debugInfo, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
         }
@@ -220,12 +240,15 @@ fun DebugInfoCard(debugInfo: String) {
 
 @Composable
 fun ResultsSection(results: List<ShadowResult>) {
+    if (results.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            "Recomendación de viaje",
+            stringResource(R.string.section_recommendation),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(vertical = 8.dp)
+            modifier = Modifier
+                .padding(vertical = 8.dp)
+                .semantics { heading() }
         )
         results.forEach { result ->
             ResultCard(result)
@@ -235,29 +258,24 @@ fun ResultsSection(results: List<ShadowResult>) {
 
 @Composable
 fun SeatMapSection(
-    routeProfile: RouteSolarProfile?,
+    recommendations: Map<VehicleType, VehicleRecommendation>,
     shadySide: String?,
-    shadePercent: Int
+    selectedVehicle: VehicleType,
+    onVehicleSelected: (VehicleType) -> Unit
 ) {
-    var vehicleType by remember { mutableStateOf(VehicleType.BUS) }
-    var selectedSeatId by remember(routeProfile, shadySide, shadePercent) {
-        mutableStateOf<String?>(null)
-    }
+    // Estado puramente de UI: asiento que el usuario toca.
+    var selectedSeatId by remember(recommendations) { mutableStateOf<String?>(null) }
 
-    val result = remember(vehicleType, routeProfile, shadySide, shadePercent) {
-        if (routeProfile != null && routeProfile.validDistanceMeters > 0.0) {
-            SeatExposureCalculator.buildPlan(routeProfile, vehicleType)
-        } else {
-            SeatExposureCalculator.fallbackPlan(vehicleType, shadySide, shadePercent)
-        }
-    }
-    val plan = result.plan
-    val recommendedId = result.recommendedSeatId
-    val recommendedSeat = plan.seats.firstOrNull { it.id == recommendedId }
-    val selectedSeat = plan.seats.firstOrNull { it.id == selectedSeatId }
+    val currentRec = recommendations[selectedVehicle]
+    val plan = currentRec?.seatResult?.plan
+    val recommendedId = currentRec?.seatResult?.recommendedSeatId
+    val recommendedSeat = plan?.seats?.firstOrNull { it.id == recommendedId }
+    val selectedSeat = plan?.seats?.firstOrNull { it.id == selectedSeatId }
+    val alternatives = currentRec?.seatResult?.alternatives.orEmpty()
+    val explanation = currentRec?.explanation
 
     AnimatedVisibility(
-        visible = shadySide != null || routeProfile != null,
+        visible = plan != null && (shadySide != null || recommendedId != null),
         enter = fadeIn() + expandVertically(),
         exit = fadeOut() + shrinkVertically()
     ) {
@@ -273,47 +291,71 @@ fun SeatMapSection(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Plano de asientos",
+                    stringResource(R.string.section_seat_map),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.align(Alignment.Start)
+                    modifier = Modifier
+                        .align(Alignment.Start)
+                        .semantics { heading() }
                 )
 
+                val vehicleSelectorDesc = stringResource(R.string.a11y_vehicle_selector)
                 VehicleTypeSelector(
-                    current = vehicleType,
+                    current = selectedVehicle,
                     onSelected = {
-                        vehicleType = it
+                        onVehicleSelected(it)
                         selectedSeatId = null
                     },
-                    modifier = Modifier.align(Alignment.Start)
-                )
-
-                SeatMap(
-                    plan = plan,
-                    selectedSeatId = selectedSeatId,
-                    recommendedSeatId = recommendedId,
-                    onSeatClick = { seat -> selectedSeatId = seat.id },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (vehicleType == VehicleType.BUS) 520.dp else 240.dp)
+                        .align(Alignment.Start)
+                        .semantics { contentDescription = vehicleSelectorDesc }
                 )
 
+                if (plan != null) {
+                    val mapDesc = stringResource(
+                        R.string.a11y_seat_map_region,
+                        selectedVehicle.label
+                    )
+                    SeatMap(
+                        plan = plan,
+                        selectedSeatId = selectedSeatId,
+                        recommendedSeatId = recommendedId,
+                        onSeatClick = { seat -> selectedSeatId = seat.id },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (selectedVehicle == VehicleType.BUS) 520.dp else 240.dp)
+                            .semantics { contentDescription = mapDesc }
+                    )
+                }
+
+                val recRegion = stringResource(R.string.a11y_recommendation_region)
                 RecommendationBadge(
                     recommendedSeat = recommendedSeat,
                     selectedSeat = selectedSeat,
                     shadySide = shadySide,
-                    modifier = Modifier.fillMaxWidth()
+                    explanation = explanation,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = recRegion }
                 )
 
-                if (result.alternatives.isNotEmpty()) {
+                if (alternatives.isNotEmpty()) {
+                    val altDesc = stringResource(R.string.a11y_alternatives_region)
                     AlternativesPills(
-                        alternatives = result.alternatives,
+                        alternatives = alternatives,
                         onPick = { id -> selectedSeatId = id },
-                        modifier = Modifier.align(Alignment.Start)
+                        modifier = Modifier
+                            .align(Alignment.Start)
+                            .semantics { contentDescription = altDesc }
                     )
                 }
 
-                SeatLegend(modifier = Modifier.align(Alignment.Start))
+                val legendDesc = stringResource(R.string.a11y_legend_region)
+                SeatLegend(
+                    modifier = Modifier
+                        .align(Alignment.Start)
+                        .semantics { contentDescription = legendDesc }
+                )
             }
         }
     }
@@ -324,6 +366,7 @@ private fun RecommendationBadge(
     recommendedSeat: Seat?,
     selectedSeat: Seat?,
     shadySide: String?,
+    explanation: RecommendationExplanation?,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -334,7 +377,7 @@ private fun RecommendationBadge(
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Text(
                 text = "★",
@@ -343,45 +386,128 @@ private fun RecommendationBadge(
             )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                if (recommendedSeat != null) {
-                    val pct = (recommendedSeat.exposure * 100).toInt()
+                when {
+                    recommendedSeat != null -> {
+                        Text(
+                            stringResource(
+                                R.string.recommended_seat_format,
+                                SeatIds.readable(recommendedSeat)
+                            ),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            stringResource(
+                                R.string.exposure_percent_format,
+                                (recommendedSeat.exposure * 100).toInt()
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                        )
+                    }
+                    shadySide != null -> {
+                        Text(
+                            stringResource(R.string.touch_seat_prompt, shadySide),
+                            fontWeight = FontWeight.Medium,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    else -> {
+                        Text(
+                            stringResource(R.string.no_data_to_recommend),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+
+                // Fase 3: explicabilidad
+                if (explanation != null && recommendedSeat != null) {
+                    Spacer(Modifier.height(6.dp))
                     Text(
-                        "Recomendado: ${SeatIds.readable(recommendedSeat)}",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        "${pct}% de exposición solar estimada",
+                        stringResource(
+                            R.string.coverage_format,
+                            explanation.coveragePercent
+                        ),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
                     )
-                } else if (shadySide != null) {
-                    Text(
-                        "Toca un asiento del lado $shadySide",
-                        fontWeight = FontWeight.Medium,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    ConfidenceBadge(
+                        confidence = explanation.confidence,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
-                } else {
-                    Text(
-                        "Sin datos suficientes para recomendar asiento",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    if (explanation.isFallback) {
+                        Text(
+                            stringResource(R.string.fallback_notice),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
 
                 if (selectedSeat != null && selectedSeat.id != recommendedSeat?.id) {
                     Spacer(Modifier.height(6.dp))
-                    val pct = (selectedSeat.exposure * 100).toInt()
                     Text(
-                        "Tu elección: ${SeatIds.readable(selectedSeat)} (${pct}% sol)",
+                        stringResource(
+                            R.string.your_choice_format,
+                            SeatIds.readable(selectedSeat),
+                            (selectedSeat.exposure * 100).toInt()
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ConfidenceBadge(
+    confidence: RecommendationConfidence,
+    modifier: Modifier = Modifier
+) {
+    val (labelRes, symbol, tint) = when (confidence) {
+        RecommendationConfidence.HIGH ->
+            Triple(R.string.confidence_high, "●●●", Color(0xFF2E7D32))
+        RecommendationConfidence.MEDIUM ->
+            Triple(R.string.confidence_medium, "●●○", Color(0xFFEF6C00))
+        RecommendationConfidence.LOW ->
+            Triple(R.string.confidence_low, "●○○", Color(0xFFC62828))
+        RecommendationConfidence.NONE ->
+            Triple(R.string.confidence_none, "○○○", Color(0xFF607D8B))
+    }
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = tint.copy(alpha = 0.15f)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = symbol,
+                color = tint,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = stringResource(
+                    R.string.confidence_format,
+                    stringResource(R.string.confidence_label),
+                    stringResource(labelRes)
+                ),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = tint
+            )
         }
     }
 }
@@ -397,7 +523,7 @@ private fun AlternativesPills(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
-            "Alternativas",
+            stringResource(R.string.section_alternatives),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant

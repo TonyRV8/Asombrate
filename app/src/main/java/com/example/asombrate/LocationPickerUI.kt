@@ -40,6 +40,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -125,7 +128,7 @@ fun LocationPickerUI(
             // Pin fijo al centro (mira telescópica estilo Uber)
             Icon(
                 imageVector = Icons.Default.Place,
-                contentDescription = "Centro del mapa",
+                contentDescription = stringResource(R.string.map_center_pin_desc),
                 tint = Color(0xFFE53935),
                 modifier = Modifier
                     .size(40.dp)
@@ -135,11 +138,13 @@ fun LocationPickerUI(
 
             // Indicador de cargando reverse geocode
             if (state.isReverseGeocoding) {
+                val loadingDesc = stringResource(R.string.loading_reverse_geocode)
                 CircularProgressIndicator(
                     modifier = Modifier
                         .size(24.dp)
                         .align(Alignment.TopEnd)
-                        .padding(8.dp),
+                        .padding(8.dp)
+                        .semantics { contentDescription = loadingDesc },
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -150,7 +155,8 @@ fun LocationPickerUI(
                 onClick = onMapConfirmed,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 12.dp)
+                    .heightIn(min = 48.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
@@ -159,7 +165,10 @@ fun LocationPickerUI(
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text(
-                    text = if (state.confirmed != null) "Confirmado" else "Confirmar ubicación",
+                    text = if (state.confirmed != null)
+                        stringResource(R.string.btn_location_confirmed)
+                    else
+                        stringResource(R.string.btn_confirm_location),
                     modifier = Modifier.padding(start = 6.dp),
                     fontWeight = FontWeight.Medium,
                     fontSize = 14.sp

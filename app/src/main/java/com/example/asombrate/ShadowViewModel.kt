@@ -1,8 +1,5 @@
 package com.example.asombrate
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.FlowPreview
@@ -30,6 +27,10 @@ class ShadowViewModel : ViewModel() {
     private val _destinationState = MutableStateFlow(LocationFieldState())
     val destinationState = _destinationState.asStateFlow()
 
+    /** Vehículo seleccionado por UI — vive en VM para que Success sea SSOT. */
+    private val _selectedVehicle = MutableStateFlow(VehicleType.BUS)
+    val selectedVehicle = _selectedVehicle.asStateFlow()
+
     // Flows internos para debounce de texto
     private val _originQuery = MutableStateFlow("")
     private val _destinationQuery = MutableStateFlow("")
@@ -37,6 +38,14 @@ class ShadowViewModel : ViewModel() {
     // Flows internos para debounce de movimiento del mapa
     private val _originMapCenter = MutableSharedFlow<LatLng>(extraBufferCapacity = 1)
     private val _destinationMapCenter = MutableSharedFlow<LatLng>(extraBufferCapacity = 1)
+
+    // Fase 2: cache TTL para reducir llamadas redundantes
+    private val geocodeCache = TtlCache<String, List<LocationSuggestion>>(ttlMillis = 5 * 60_000L)
+    private val reverseGeocodeCache = TtlCache<String, String>(ttlMillis = 5 * 60_000L)
+
+    // Último punto consultado por reverse para evitar micro-movimientos.
+    private var lastOriginReverseAt: LatLng? = null
+    private var lastDestinationReverseAt: LatLng? = null
 
     private var selectedCalendar: Calendar = Calendar.getInstance()
     private val apiKey = BuildConfig.ORS_API_KEY
@@ -62,18 +71,37 @@ class ShadowViewModel : ViewModel() {
         viewModelScope.launch {
             _originMapCenter
                 .debounce(500)
-                .collect { center -> reverseGeocode(center, _originState) }
+                .collect { center ->
+                    if (MapMoveThreshold.shouldTrigger(lastOriginReverseAt, center)) {
+                        lastOriginReverseAt = center
+                        reverseGeocode(center, _originState)
+                    } else {
+                        // Movimiento despreciable: limpia estado de loading sin consumir API.
+                        _originState.update { it.copy(isReverseGeocoding = false) }
+                    }
+                }
         }
         // Debounce reverse geocode - Destino (500ms)
         viewModelScope.launch {
             _destinationMapCenter
                 .debounce(500)
-                .collect { center -> reverseGeocode(center, _destinationState) }
+                .collect { center ->
+                    if (MapMoveThreshold.shouldTrigger(lastDestinationReverseAt, center)) {
+                        lastDestinationReverseAt = center
+                        reverseGeocode(center, _destinationState)
+                    } else {
+                        _destinationState.update { it.copy(isReverseGeocoding = false) }
+                    }
+                }
         }
     }
 
     fun updateDepartureTime(calendar: Calendar) {
         selectedCalendar = calendar
+    }
+
+    fun selectVehicle(type: VehicleType) {
+        _selectedVehicle.value = type
     }
 
     // --- Búsqueda por texto ---
@@ -101,6 +129,7 @@ class ShadowViewModel : ViewModel() {
                 flyToVersion = it.flyToVersion + 1
             )
         }
+        lastOriginReverseAt = LatLng(suggestion.lat, suggestion.lng)
     }
 
     fun onDestinationSelected(suggestion: LocationSuggestion) {
@@ -114,6 +143,7 @@ class ShadowViewModel : ViewModel() {
                 flyToVersion = it.flyToVersion + 1
             )
         }
+        lastDestinationReverseAt = LatLng(suggestion.lat, suggestion.lng)
     }
 
     // --- Movimiento manual del mapa → reverse geocode ---
@@ -135,7 +165,6 @@ class ShadowViewModel : ViewModel() {
     // --- Confirmar ubicación desde el mapa ---
 
     fun onOriginMapConfirmed() {
-        val s = _originState.value
         _originState.update {
             it.copy(
                 confirmed = LocationSuggestion(
@@ -167,9 +196,15 @@ class ShadowViewModel : ViewModel() {
         query: String,
         state: MutableStateFlow<LocationFieldState>
     ) {
+        // Fase 2: cache por query normalizada
+        val key = query.trim().lowercase()
+        geocodeCache.get(key)?.let { cached ->
+            state.update { it.copy(suggestions = cached, isSearching = false) }
+            return
+        }
         state.update { it.copy(isSearching = true) }
         try {
-            val response = RetrofitClient.instance.geocode(query, apiKey)
+            val response = retryingCall { RetrofitClient.instance.geocode(query, apiKey) }
             val suggestions = response.features.map { feature ->
                 LocationSuggestion(
                     label = feature.properties.label,
@@ -177,6 +212,7 @@ class ShadowViewModel : ViewModel() {
                     lng = feature.geometry.coordinates[0]
                 )
             }
+            geocodeCache.put(key, suggestions)
             state.update { it.copy(suggestions = suggestions, isSearching = false) }
         } catch (_: Exception) {
             state.update { it.copy(suggestions = emptyList(), isSearching = false) }
@@ -187,15 +223,24 @@ class ShadowViewModel : ViewModel() {
         center: LatLng,
         state: MutableStateFlow<LocationFieldState>
     ) {
+        // Fase 2: cache por lat/lng redondeado (bucket ~10m)
+        val key = "%.4f,%.4f".format(center.lat, center.lng)
+        reverseGeocodeCache.get(key)?.let { cached ->
+            state.update { it.copy(query = cached, isReverseGeocoding = false) }
+            return
+        }
         state.update { it.copy(isReverseGeocoding = true) }
         try {
-            val response = RetrofitClient.instance.reverseGeocode(
-                lat = center.lat,
-                lon = center.lng,
-                apiKey = apiKey
-            )
+            val response = retryingCall {
+                RetrofitClient.instance.reverseGeocode(
+                    lat = center.lat,
+                    lon = center.lng,
+                    apiKey = apiKey
+                )
+            }
             val label = response.features.firstOrNull()?.properties?.label
                 ?: "%.5f, %.5f".format(center.lat, center.lng)
+            reverseGeocodeCache.put(key, label)
             state.update {
                 it.copy(query = label, isReverseGeocoding = false)
             }
@@ -238,97 +283,47 @@ class ShadowViewModel : ViewModel() {
                 )
 
                 val response = try {
-                    RetrofitClient.instance.getDirections(
-                        apiKey = apiKey,
-                        request = routeRequest
-                    )
+                    retryingCall {
+                        RetrofitClient.instance.getDirections(
+                            apiKey = apiKey,
+                            request = routeRequest
+                        )
+                    }
                 } catch (e: Exception) {
-                    _uiState.value = ShadowState.Error("Error de red", debugLog + "Error: ${e.message}")
+                    val err = NetworkErrorClassifier.classify(e)
+                    _uiState.value = ShadowState.Error(
+                        err.userMessage,
+                        debugLog + err.debugDetail
+                    )
                     return@launch
                 }
 
                 val routes = response.routes
-                if (!routes.isNullOrEmpty()) {
-                    val geometry = routes[0].geometry
-
-                    if (geometry.isNullOrBlank()) {
-                        _uiState.value = ShadowState.Error("Respuesta sin geometría", debugLog)
-                        return@launch
-                    }
-
-                    val points = ShadowUtils.decodePolyline(geometry)
-                    debugLog += "Puntos en ruta: ${points.size}\n"
-
-                    // Fase 2: profile por segmento ponderado por distancia
-                    val profile = SeatExposureCalculator.computeProfile(points, selectedCalendar)
-                    debugLog += "Segmentos: ${profile.segments.size} " +
-                        "distTotal=${"%.0f".format(profile.totalDistanceMeters)}m " +
-                        "distValida=${"%.0f".format(profile.validDistanceMeters)}m\n"
-
-                    // Lado/porcentaje dominantes a partir del profile (ponderado por distancia)
-                    var leftShade = 0.0
-                    var rightShade = 0.0
-                    var overhead = 0.0
-                    for (seg in profile.segments) {
-                        when (seg.shadeSide) {
-                            ShadeSide.LEFT -> leftShade += seg.distanceMeters
-                            ShadeSide.RIGHT -> rightShade += seg.distanceMeters
-                            ShadeSide.OVERHEAD -> overhead += seg.distanceMeters
-                            ShadeSide.NONE -> Unit
-                        }
-                    }
-                    val totalShade = leftShade + rightShade + overhead
-                    var shadySide: String? = null
-                    var shadePercent = 0
-                    if (totalShade > 0.0) {
-                        shadySide = if (rightShade >= leftShade) "DERECHO" else "IZQUIERDO"
-                        val dominant =
-                            if (shadySide == "DERECHO") rightShade else leftShade
-                        shadePercent = ((dominant * 100.0) / totalShade).toInt()
-                    }
-
-                    // Plan por defecto (BUS) con cálculo real, o null si no hay datos
-                    val defaultSeatResult: SeatExposureResult? =
-                        if (profile.validDistanceMeters > 0.0) {
-                            SeatExposureCalculator.buildPlan(profile, VehicleType.BUS)
-                        } else null
-
-                    val finalResults = mutableListOf<ShadowResult>()
-                    if (shadySide != null) {
-                        val recId = defaultSeatResult?.recommendedSeatId
-                        val recSeat = defaultSeatResult?.plan?.seats?.firstOrNull { it.id == recId }
-                        val title = if (recSeat != null) {
-                            "Siéntate en ${SeatIds.readable(recSeat)}"
-                        } else {
-                            "Siéntate del lado $shadySide"
-                        }
-                        val desc = if (recSeat != null) {
-                            val pct = (recSeat.exposure * 100).toInt()
-                            "Asiento con menor exposición al sol (${pct}%). " +
-                                "Lado $shadySide sombreado en $shadePercent% del trayecto."
-                        } else {
-                            "Tendrás sombra el $shadePercent% del trayecto."
-                        }
-                        finalResults.add(
-                            ShadowResult(title, desc, Icons.Default.Check, Color(0xFF4CAF50))
-                        )
-                    }
-
-                    defaultSeatResult?.let { debugLog += it.metrics }
-
-                    _uiState.value = ShadowState.Success(
-                        results = finalResults,
-                        debugInfo = debugLog,
-                        shadySide = shadySide,
-                        shadePercent = shadePercent,
-                        routeProfile = profile,
-                        defaultSeatResult = defaultSeatResult
-                    )
-                } else {
+                if (routes.isNullOrEmpty()) {
                     _uiState.value = ShadowState.Error("No se encontró ruta", debugLog)
+                    return@launch
                 }
+
+                val geometry = routes[0].geometry
+                if (geometry.isNullOrBlank()) {
+                    _uiState.value = ShadowState.Error("Respuesta sin geometría", debugLog)
+                    return@launch
+                }
+
+                val points = ShadowUtils.decodePolyline(geometry)
+                debugLog += "Puntos en ruta: ${points.size}\n"
+
+                _uiState.value = ShadowCalculation.buildSuccess(
+                    points = points,
+                    calendar = selectedCalendar,
+                    debugHeader = debugLog
+                )
             } catch (e: Exception) {
-                _uiState.value = ShadowState.Error("Error crítico", debugLog + "Ex: ${e.message}")
+                val err = NetworkErrorClassifier.classify(e)
+                _uiState.value = ShadowState.Error(
+                    err.userMessage,
+                    debugLog + "Ex: " + err.debugDetail
+                )
             }
         }
     }

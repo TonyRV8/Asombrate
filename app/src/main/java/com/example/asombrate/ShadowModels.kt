@@ -6,9 +6,9 @@ import com.google.gson.annotations.SerializedName
 
 // Modelo para los resultados de sombra
 data class ShadowResult(
-    val title: String, 
-    val description: String, 
-    val icon: ImageVector, 
+    val title: String,
+    val description: String,
+    val icon: ImageVector,
     val color: Color
 )
 
@@ -68,6 +68,32 @@ data class LocationFieldState(
     val flyToVersion: Int = 0       // Se incrementa para indicar animación programática
 )
 
+/** Nivel de confianza de la recomendación de asiento. */
+enum class RecommendationConfidence { HIGH, MEDIUM, LOW, NONE }
+
+/**
+ * Datos estructurados de explicación calculados en el ViewModel
+ * para que la UI solo pinte (sin recomputar nada).
+ */
+data class RecommendationExplanation(
+    val recommendedSeatId: String?,
+    val recommendedSeatReadable: String?,
+    val exposurePercent: Int,
+    val coveragePercent: Int,      // distancia válida / distancia total
+    val confidence: RecommendationConfidence,
+    val isFallback: Boolean
+)
+
+/**
+ * Pre-cómputo listo para render por tipo de vehículo.
+ * La UI selecciona por VehicleType sin recalcular lógica solar.
+ */
+data class VehicleRecommendation(
+    val vehicleType: VehicleType,
+    val seatResult: SeatExposureResult,
+    val explanation: RecommendationExplanation
+)
+
 sealed class ShadowState {
     object Idle : ShadowState()
     object Loading : ShadowState()
@@ -77,10 +103,11 @@ sealed class ShadowState {
         val shadySide: String? = null,   // "IZQUIERDO" / "DERECHO" / null
         val shadePercent: Int = 0,       // 0..100
         val routeProfile: RouteSolarProfile? = null,
-        val defaultSeatResult: SeatExposureResult? = null
+        // Pre-cómputo por vehículo: UI no hace negocio.
+        val recommendations: Map<VehicleType, VehicleRecommendation> = emptyMap()
     ) : ShadowState()
     data class Error(
-        val message: String, 
+        val message: String,
         val debugInfo: String? = null
     ) : ShadowState()
 }

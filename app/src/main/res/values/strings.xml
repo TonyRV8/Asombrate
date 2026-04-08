@@ -1,3 +1,72 @@
 <resources>
     <string name="app_name">Asombrate</string>
+
+    <!-- Formulario -->
+    <string name="label_origin">Origen</string>
+    <string name="label_destination">Destino</string>
+    <string name="placeholder_origin">Ej: Bellas Artes</string>
+    <string name="placeholder_destination">Ej: Ángel de la Independencia</string>
+    <string name="label_departure_time">Hora de salida</string>
+    <string name="departure_now">Ahora</string>
+    <string name="btn_calculate_shadow">Calcular Sombra</string>
+
+    <!-- Mapa -->
+    <string name="map_center_pin_desc">Pin al centro del mapa</string>
+    <string name="btn_confirm_location">Confirmar ubicación</string>
+    <string name="btn_location_confirmed">Confirmado</string>
+    <string name="loading_reverse_geocode">Buscando dirección del punto del mapa</string>
+
+    <!-- Resultados -->
+    <string name="section_recommendation">Recomendación de viaje</string>
+    <string name="section_seat_map">Plano de asientos</string>
+    <string name="section_alternatives">Alternativas</string>
+    <string name="debug_section_title">Información Técnica (Debug)</string>
+
+    <!-- Recomendación -->
+    <string name="recommended_seat_format">Recomendado: %1$s</string>
+    <string name="your_choice_format">Tu elección: %1$s (%2$d%% sol)</string>
+    <string name="touch_seat_prompt">Toca un asiento del lado %1$s</string>
+    <string name="no_data_to_recommend">Sin datos suficientes para recomendar asiento</string>
+    <string name="exposure_percent_format">%1$d%% de exposición solar estimada</string>
+    <string name="coverage_format">Cobertura solar calculada: %1$d%% del trayecto</string>
+    <string name="fallback_notice">Estimación aproximada por falta de datos solares completos.</string>
+
+    <!-- Confianza -->
+    <string name="confidence_label">Confianza</string>
+    <string name="confidence_high">Alta</string>
+    <string name="confidence_medium">Media</string>
+    <string name="confidence_low">Baja</string>
+    <string name="confidence_none">Sin datos</string>
+    <string name="confidence_format">%1$s · %2$s</string>
+
+    <!-- Errores -->
+    <string name="error_confirm_before_calc">Confirma origen y destino antes de calcular</string>
+
+    <!-- Accesibilidad -->
+    <string name="a11y_seat_map_region">Plano de asientos del %1$s. Toca un asiento para seleccionarlo.</string>
+    <string name="a11y_recommendation_region">Recomendación de asiento</string>
+    <string name="a11y_alternatives_region">Asientos alternativos</string>
+    <string name="a11y_legend_region">Leyenda de estados de asiento</string>
+    <string name="a11y_vehicle_selector">Selector de tipo de vehículo</string>
+    <string name="a11y_calculate_button">Calcular el lado con más sombra del trayecto</string>
+
+    <!-- Estados de asiento -->
+    <string name="seat_state_sun">sol directo</string>
+    <string name="seat_state_partial">sol parcial</string>
+    <string name="seat_state_shade">sombra</string>
+    <string name="seat_state_neutral">sin datos</string>
+    <string name="seat_state_selected">seleccionado</string>
+
+    <!-- Leyenda -->
+    <string name="legend_sun">Sol ☀</string>
+    <string name="legend_partial">Parcial ◐</string>
+    <string name="legend_shade">Sombra</string>
+    <string name="legend_neutral">Neutro</string>
+    <string name="legend_selected">Selección</string>
+    <string name="legend_recommended">Recomendado ★</string>
+
+    <!-- Descripciones de asiento -->
+    <string name="seat_desc_format">Asiento %1$s, %2$s</string>
+    <string name="seat_desc_exposure_format">, %1$d por ciento de sol</string>
+    <string name="seat_desc_recommended">, recomendado</string>
 </resources>

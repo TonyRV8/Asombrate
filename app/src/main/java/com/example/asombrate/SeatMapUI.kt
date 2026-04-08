@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -70,13 +71,16 @@ private fun stateGlyph(state: SeatState): String? = when (state) {
     SeatState.SELECTED -> null
 }
 
-private fun stateLabel(state: SeatState): String = when (state) {
-    SeatState.SUN -> "sol directo"
-    SeatState.PARTIAL -> "sol parcial"
-    SeatState.SHADE -> "sombra"
-    SeatState.NEUTRAL -> "sin datos"
-    SeatState.SELECTED -> "seleccionado"
-}
+@Composable
+private fun stateLabel(state: SeatState): String = stringResource(
+    when (state) {
+        SeatState.SUN -> R.string.seat_state_sun
+        SeatState.PARTIAL -> R.string.seat_state_partial
+        SeatState.SHADE -> R.string.seat_state_shade
+        SeatState.NEUTRAL -> R.string.seat_state_neutral
+        SeatState.SELECTED -> R.string.seat_state_selected
+    }
+)
 
 @Composable
 fun VehicleTypeSelector(
@@ -231,12 +235,14 @@ private fun SeatCell(
         label = "seatScale"
     )
 
-    val description = buildString {
-        append("Asiento ${SeatIds.readable(seat)}, ")
-        append(stateLabel(state))
-        if (seat.exposure > 0.0) append(", ${(seat.exposure * 100).toInt()} por ciento de sol")
-        if (isRecommended) append(", recomendado")
-    }
+    val stateLabelText = stateLabel(state)
+    val baseDesc = stringResource(R.string.seat_desc_format, SeatIds.readable(seat), stateLabelText)
+    val exposureSuffix = if (seat.exposure > 0.0)
+        stringResource(R.string.seat_desc_exposure_format, (seat.exposure * 100).toInt())
+    else ""
+    val recommendedSuffix = if (isRecommended)
+        stringResource(R.string.seat_desc_recommended) else ""
+    val description = baseDesc + exposureSuffix + recommendedSuffix
 
     Box(
         modifier = Modifier
@@ -328,12 +334,12 @@ private fun SeatCell(
 @Composable
 fun SeatLegend(modifier: Modifier = Modifier) {
     val items = listOf(
-        LegendEntry("Sol ☀", ColorSun),
-        LegendEntry("Parcial ◐", ColorPartial),
-        LegendEntry("Sombra", ColorShade),
-        LegendEntry("Neutro", ColorNeutral),
-        LegendEntry("Selección", ColorSelected),
-        LegendEntry("Recomendado ★", ColorRecommendedGlow)
+        LegendEntry(stringResource(R.string.legend_sun), ColorSun),
+        LegendEntry(stringResource(R.string.legend_partial), ColorPartial),
+        LegendEntry(stringResource(R.string.legend_shade), ColorShade),
+        LegendEntry(stringResource(R.string.legend_neutral), ColorNeutral),
+        LegendEntry(stringResource(R.string.legend_selected), ColorSelected),
+        LegendEntry(stringResource(R.string.legend_recommended), ColorRecommendedGlow)
     )
     Column(
         modifier = modifier,

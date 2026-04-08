@@ -85,3 +85,45 @@ Comandos de validación recomendados
 - macOS/Linux:
   ./gradlew :app:assembleDebug
   ./gradlew :app:testDebugUnitTest
+
+Estado actual (actualizado)
+
+- Ya existe plano de asientos por vehículo (Auto 2x2 y Autobús 10x4).
+- Ya existe cálculo por asiento con exposición estimada al sol ponderada por distancia.
+- Ya existe recomendación automática por asiento + top de alternativas.
+- Ya existe fallback cuando no hay datos solares suficientes.
+- Ya existen assets de asientos y carrocería en drawable para render visual.
+- Ya existen pruebas unitarias para el calculador de exposición de asientos.
+
+Backlog priorizado para siguientes iteraciones
+
+Fase 1 - Fuente única de verdad en estado/UI
+
+- Evitar recalcular planes de asientos en Composables si ya están en estado del ViewModel.
+- Concentrar recomendación y plan final en el estado de éxito.
+- Reducir duplicidad de lógica entre UI y capa de estado.
+
+Fase 2 - Robustez de red y control de consumo ORS
+
+- Manejar errores HTTP con mayor detalle (429, 5xx, timeouts).
+- Implementar reintentos acotados para fallos transitorios.
+- Reducir llamadas repetidas con cache liviano para geocode y reverse geocode.
+- Evitar solicitudes innecesarias por movimientos pequeños de mapa.
+
+Fase 3 - Explicabilidad y confianza de recomendación
+
+- Mostrar nivel de confianza (alta/media/baja) para la recomendación.
+- Explicar brevemente por qué se eligió un asiento.
+- Mejorar el texto de fallback cuando no hay suficientes datos.
+
+Fase 4 - Accesibilidad e internacionalización
+
+- Mover textos hardcodeados a resources strings.
+- Reforzar semántica para lector de pantalla.
+- Verificar targets táctiles y contraste visual en asientos/leyendas.
+
+Fase 5 - Calidad de pruebas end-to-end de presentación
+
+- Agregar pruebas de ViewModel para flujos de éxito, fallback y error.
+- Agregar pruebas de UI Compose para selección, recomendado, cambio de vehículo y alternativas.
+- Mantener y extender cobertura sin romper pruebas existentes.
