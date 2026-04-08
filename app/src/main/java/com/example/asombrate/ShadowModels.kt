@@ -72,8 +72,12 @@ sealed class ShadowState {
     object Idle : ShadowState()
     object Loading : ShadowState()
     data class Success(
-        val results: List<ShadowResult>, 
-        val debugInfo: String
+        val results: List<ShadowResult>,
+        val debugInfo: String,
+        val shadySide: String? = null,   // "IZQUIERDO" / "DERECHO" / null
+        val shadePercent: Int = 0,       // 0..100
+        val routeProfile: RouteSolarProfile? = null,
+        val defaultSeatResult: SeatExposureResult? = null
     ) : ShadowState()
     data class Error(
         val message: String, 

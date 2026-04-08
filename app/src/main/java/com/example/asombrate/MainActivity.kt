@@ -7,6 +7,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -162,6 +166,11 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                 }
                 is ShadowState.Success -> {
                     ResultsSection(state.results)
+                    SeatMapSection(
+                        routeProfile = state.routeProfile,
+                        shadySide = state.shadySide,
+                        shadePercent = state.shadePercent
+                    )
                     DebugInfoCard(state.debugInfo)
                 }
                 else -> {}
@@ -220,6 +229,186 @@ fun ResultsSection(results: List<ShadowResult>) {
         )
         results.forEach { result ->
             ResultCard(result)
+        }
+    }
+}
+
+@Composable
+fun SeatMapSection(
+    routeProfile: RouteSolarProfile?,
+    shadySide: String?,
+    shadePercent: Int
+) {
+    var vehicleType by remember { mutableStateOf(VehicleType.BUS) }
+    var selectedSeatId by remember(routeProfile, shadySide, shadePercent) {
+        mutableStateOf<String?>(null)
+    }
+
+    val result = remember(vehicleType, routeProfile, shadySide, shadePercent) {
+        if (routeProfile != null && routeProfile.validDistanceMeters > 0.0) {
+            SeatExposureCalculator.buildPlan(routeProfile, vehicleType)
+        } else {
+            SeatExposureCalculator.fallbackPlan(vehicleType, shadySide, shadePercent)
+        }
+    }
+    val plan = result.plan
+    val recommendedId = result.recommendedSeatId
+    val recommendedSeat = plan.seats.firstOrNull { it.id == recommendedId }
+    val selectedSeat = plan.seats.firstOrNull { it.id == selectedSeatId }
+
+    AnimatedVisibility(
+        visible = shadySide != null || routeProfile != null,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically()
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Plano de asientos",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                VehicleTypeSelector(
+                    current = vehicleType,
+                    onSelected = {
+                        vehicleType = it
+                        selectedSeatId = null
+                    },
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                SeatMap(
+                    plan = plan,
+                    selectedSeatId = selectedSeatId,
+                    recommendedSeatId = recommendedId,
+                    onSeatClick = { seat -> selectedSeatId = seat.id },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (vehicleType == VehicleType.BUS) 520.dp else 240.dp)
+                )
+
+                RecommendationBadge(
+                    recommendedSeat = recommendedSeat,
+                    selectedSeat = selectedSeat,
+                    shadySide = shadySide,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (result.alternatives.isNotEmpty()) {
+                    AlternativesPills(
+                        alternatives = result.alternatives,
+                        onPick = { id -> selectedSeatId = id },
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                }
+
+                SeatLegend(modifier = Modifier.align(Alignment.Start))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecommendationBadge(
+    recommendedSeat: Seat?,
+    selectedSeat: Seat?,
+    shadySide: String?,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "★",
+                fontSize = 22.sp,
+                color = Color(0xFFFFC107)
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                if (recommendedSeat != null) {
+                    val pct = (recommendedSeat.exposure * 100).toInt()
+                    Text(
+                        "Recomendado: ${SeatIds.readable(recommendedSeat)}",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        "${pct}% de exposición solar estimada",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                    )
+                } else if (shadySide != null) {
+                    Text(
+                        "Toca un asiento del lado $shadySide",
+                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                } else {
+                    Text(
+                        "Sin datos suficientes para recomendar asiento",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+
+                if (selectedSeat != null && selectedSeat.id != recommendedSeat?.id) {
+                    Spacer(Modifier.height(6.dp))
+                    val pct = (selectedSeat.exposure * 100).toInt()
+                    Text(
+                        "Tu elección: ${SeatIds.readable(selectedSeat)} (${pct}% sol)",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlternativesPills(
+    alternatives: List<String>,
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            "Alternativas",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            alternatives.forEach { id ->
+                AssistChip(
+                    onClick = { onPick(id) },
+                    label = { Text(id, fontWeight = FontWeight.SemiBold) }
+                )
+            }
         }
     }
 }

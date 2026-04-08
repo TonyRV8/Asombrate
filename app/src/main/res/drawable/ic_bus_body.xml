@@ -1,0 +1,70 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="220dp"
+    android:height="420dp"
+    android:viewportWidth="1100"
+    android:viewportHeight="2100">
+    <!-- Outer body with linear gradient -->
+    <path android:pathData="M365,90 H735 C821,90 873,112 910,157 C944,198 958,260 958,352 V1748 C958,1840 944,1902 910,1943 C873,1988 821,2010 735,2010 H365 C279,2010 227,1988 190,1943 C156,1902 142,1840 142,1748 V352 C142,260 156,198 190,157 C227,112 279,90 365,90 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="220"
+                android:startY="120"
+                android:endX="860"
+                android:endY="1960">
+                <item android:color="#FAFCFD" android:offset="0"/>
+                <item android:color="#EFF4F8" android:offset="0.55"/>
+                <item android:color="#E1E8EF" android:offset="1"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Inner wash -->
+    <path
+        android:pathData="M385,140 H715 C782,140 823,157 851,192 C878,225 889,274 889,352 V1748 C889,1826 878,1875 851,1908 C823,1943 782,1960 715,1960 H385 C318,1960 277,1943 249,1908 C222,1875 211,1826 211,1748 V352 C211,274 222,225 249,192 C277,157 318,140 385,140 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.55"/>
+    <!-- Front cockpit hint -->
+    <path
+        android:pathData="M325,260 C380,230 450,214 550,214 C650,214 720,230 775,260 C814,282 835,314 835,360 C835,383 830,402 820,420 L280,420 C270,402 265,383 265,360 C265,314 286,282 325,260 Z"
+        android:fillColor="#E4ECF3"
+        android:fillAlpha="0.55"/>
+    <!-- Cockpit divider -->
+    <path
+        android:pathData="M280,420 L820,420"
+        android:strokeColor="#B8C4CF"
+        android:strokeWidth="3"
+        android:strokeAlpha="0.45"/>
+    <!-- Central aisle glow -->
+    <path
+        android:pathData="M550,480 L550,1830"
+        android:strokeColor="#C8D3DC"
+        android:strokeWidth="48"
+        android:strokeAlpha="0.35"
+        android:strokeLineCap="round"/>
+    <!-- Thin aisle centerline -->
+    <path
+        android:pathData="M550,500 L550,1810"
+        android:strokeColor="#93A3B0"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.35"/>
+    <!-- Left column rail -->
+    <path
+        android:pathData="M305,500 L305,1810"
+        android:strokeColor="#B6C2CE"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.35"/>
+    <!-- Right column rail -->
+    <path
+        android:pathData="M795,500 L795,1810"
+        android:strokeColor="#B6C2CE"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.35"/>
+    <!-- Rear hint -->
+    <path
+        android:pathData="M330,1860 C395,1842 468,1832 550,1832 C632,1832 705,1842 770,1860"
+        android:strokeColor="#B6C2CE"
+        android:strokeWidth="3"
+        android:strokeAlpha="0.45"
+        android:strokeLineCap="round"/>
+</vector>

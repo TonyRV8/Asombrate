@@ -259,45 +259,71 @@ class ShadowViewModel : ViewModel() {
                     val points = ShadowUtils.decodePolyline(geometry)
                     debugLog += "Puntos en ruta: ${points.size}\n"
 
-                    var leftCount = 0
-                    var rightCount = 0
-                    var highSunCount = 0
+                    // Fase 2: profile por segmento ponderado por distancia
+                    val profile = SeatExposureCalculator.computeProfile(points, selectedCalendar)
+                    debugLog += "Segmentos: ${profile.segments.size} " +
+                        "distTotal=${"%.0f".format(profile.totalDistanceMeters)}m " +
+                        "distValida=${"%.0f".format(profile.validDistanceMeters)}m\n"
 
-                    for (i in 0 until points.size - 1) {
-                        val start = points[i]
-                        val end = points[i + 1]
-                        val bearing = ShadowUtils.calculateBearing(start, end)
-                        val side = ShadowUtils.calculateShadowSide(
-                            bearing, start.lat, start.lng, selectedCalendar
-                        )
-                        when (side) {
-                            "IZQUIERDA" -> leftCount++
-                            "DERECHA" -> rightCount++
-                            "TECHO" -> highSunCount++
+                    // Lado/porcentaje dominantes a partir del profile (ponderado por distancia)
+                    var leftShade = 0.0
+                    var rightShade = 0.0
+                    var overhead = 0.0
+                    for (seg in profile.segments) {
+                        when (seg.shadeSide) {
+                            ShadeSide.LEFT -> leftShade += seg.distanceMeters
+                            ShadeSide.RIGHT -> rightShade += seg.distanceMeters
+                            ShadeSide.OVERHEAD -> overhead += seg.distanceMeters
+                            ShadeSide.NONE -> Unit
                         }
                     }
+                    val totalShade = leftShade + rightShade + overhead
+                    var shadySide: String? = null
+                    var shadePercent = 0
+                    if (totalShade > 0.0) {
+                        shadySide = if (rightShade >= leftShade) "DERECHO" else "IZQUIERDO"
+                        val dominant =
+                            if (shadySide == "DERECHO") rightShade else leftShade
+                        shadePercent = ((dominant * 100.0) / totalShade).toInt()
+                    }
+
+                    // Plan por defecto (BUS) con cálculo real, o null si no hay datos
+                    val defaultSeatResult: SeatExposureResult? =
+                        if (profile.validDistanceMeters > 0.0) {
+                            SeatExposureCalculator.buildPlan(profile, VehicleType.BUS)
+                        } else null
 
                     val finalResults = mutableListOf<ShadowResult>()
-                    val total = leftCount + rightCount + highSunCount
-
-                    if (total > 0) {
-                        val side = if (rightCount >= leftCount) "DERECHO" else "IZQUIERDO"
-                        val percent = if (rightCount >= leftCount) {
-                            rightCount * 100 / total
+                    if (shadySide != null) {
+                        val recId = defaultSeatResult?.recommendedSeatId
+                        val recSeat = defaultSeatResult?.plan?.seats?.firstOrNull { it.id == recId }
+                        val title = if (recSeat != null) {
+                            "Siéntate en ${SeatIds.readable(recSeat)}"
                         } else {
-                            leftCount * 100 / total
+                            "Siéntate del lado $shadySide"
+                        }
+                        val desc = if (recSeat != null) {
+                            val pct = (recSeat.exposure * 100).toInt()
+                            "Asiento con menor exposición al sol (${pct}%). " +
+                                "Lado $shadySide sombreado en $shadePercent% del trayecto."
+                        } else {
+                            "Tendrás sombra el $shadePercent% del trayecto."
                         }
                         finalResults.add(
-                            ShadowResult(
-                                "Siéntate del lado $side",
-                                "Tendrás sombra el $percent% del trayecto.",
-                                Icons.Default.Check,
-                                Color(0xFF4CAF50)
-                            )
+                            ShadowResult(title, desc, Icons.Default.Check, Color(0xFF4CAF50))
                         )
                     }
 
-                    _uiState.value = ShadowState.Success(finalResults, debugLog)
+                    defaultSeatResult?.let { debugLog += it.metrics }
+
+                    _uiState.value = ShadowState.Success(
+                        results = finalResults,
+                        debugInfo = debugLog,
+                        shadySide = shadySide,
+                        shadePercent = shadePercent,
+                        routeProfile = profile,
+                        defaultSeatResult = defaultSeatResult
+                    )
                 } else {
                     _uiState.value = ShadowState.Error("No se encontró ruta", debugLog)
                 }

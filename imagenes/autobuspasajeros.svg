@@ -1,0 +1,189 @@
+<svg width="1100" height="2100" viewBox="0 0 1100 2100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="canvasBg" x1="0" y1="0" x2="0" y2="2100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#EEF2F6"/>
+    </linearGradient>
+
+    <linearGradient id="busFill" x1="220" y1="120" x2="860" y2="1960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FAFCFD" stop-opacity="0.92"/>
+      <stop offset="0.55" stop-color="#EFF4F8" stop-opacity="0.86"/>
+      <stop offset="1" stop-color="#E7EDF3" stop-opacity="0.9"/>
+    </linearGradient>
+
+    <linearGradient id="innerWash" x1="300" y1="180" x2="800" y2="1900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.50"/>
+      <stop offset="1" stop-color="#DCE4EB" stop-opacity="0.14"/>
+    </linearGradient>
+
+    <linearGradient id="aisleGlow" x1="550" y1="260" x2="550" y2="1840" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7FAFC" stop-opacity="0.22"/>
+      <stop offset="0.5" stop-color="#E6EDF3" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#DDE6ED" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <filter id="softBlur" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+
+    <filter id="edgeSoft" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+
+    <filter id="halo" x="-30%" y="-20%" width="160%" height="140%">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+  </defs>
+
+  <rect width="1100" height="2100" fill="url(#canvasBg)"/>
+
+  <g opacity="0.35" filter="url(#halo)">
+    <rect x="235" y="130" width="630" height="1840" rx="115" fill="#F4F8FB"/>
+  </g>
+
+  <g opacity="0.98">
+    <path
+      d="M365 90
+         H735
+         C821 90 873 112 910 157
+         C944 198 958 260 958 352
+         V1748
+         C958 1840 944 1902 910 1943
+         C873 1988 821 2010 735 2010
+         H365
+         C279 2010 227 1988 190 1943
+         C156 1902 142 1840 142 1748
+         V352
+         C142 260 156 198 190 157
+         C227 112 279 90 365 90 Z"
+      fill="url(#busFill)"
+      filter="url(#softBlur)"/>
+
+    <path
+      d="M365 95
+         H735
+         C819 95 870 116 906 160
+         C939 201 952 262 952 352
+         V1748
+         C952 1838 939 1899 906 1940
+         C870 1984 819 2005 735 2005
+         H365
+         C281 2005 230 1984 194 1940
+         C161 1899 148 1838 148 1748
+         V352
+         C148 262 161 201 194 160
+         C230 116 281 95 365 95 Z"
+      fill="url(#busFill)"/>
+
+    <path
+      d="M385 140
+         H715
+         C782 140 823 157 851 192
+         C878 225 889 274 889 352
+         V1748
+         C889 1826 878 1875 851 1908
+         C823 1943 782 1960 715 1960
+         H385
+         C318 1960 277 1943 249 1908
+         C222 1875 211 1826 211 1748
+         V352
+         C211 274 222 225 249 192
+         C277 157 318 140 385 140 Z"
+      fill="url(#innerWash)"
+      opacity="0.9"/>
+
+    <!-- front cockpit hint -->
+    <path
+      d="M325 260
+         C380 230 450 214 550 214
+         C650 214 720 230 775 260
+         C814 282 835 314 835 360
+         C835 383 830 402 820 420
+         H280
+         C270 402 265 383 265 360
+         C265 314 286 282 325 260 Z"
+      fill="#E8EFF5"
+      fill-opacity="0.22"
+      filter="url(#edgeSoft)"/>
+
+    <path
+      d="M280 420 H820"
+      stroke="#D7E0E8"
+      stroke-opacity="0.26"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      filter="url(#edgeSoft)"/>
+
+    <!-- central aisle -->
+    <path
+      d="M550 470 V1820"
+      stroke="url(#aisleGlow)"
+      stroke-width="120"
+      stroke-linecap="round"
+      filter="url(#softBlur)"/>
+
+    <path
+      d="M550 500 V1790"
+      stroke="#DCE5EC"
+      stroke-opacity="0.16"
+      stroke-width="2"
+      stroke-linecap="round"/>
+
+    <!-- side structure hints -->
+    <path
+      d="M305 500 V1810"
+      stroke="#DDE5EC"
+      stroke-opacity="0.12"
+      stroke-width="1.8"
+      stroke-linecap="round"/>
+
+    <path
+      d="M795 500 V1810"
+      stroke="#DDE5EC"
+      stroke-opacity="0.12"
+      stroke-width="1.8"
+      stroke-linecap="round"/>
+
+    <!-- faint row separators for seat overlay guidance -->
+    <g stroke="#DCE4EB" stroke-opacity="0.12" stroke-width="1.4" stroke-linecap="round" filter="url(#edgeSoft)">
+      <path d="M270 560 H830"/>
+      <path d="M270 690 H830"/>
+      <path d="M270 820 H830"/>
+      <path d="M270 950 H830"/>
+      <path d="M270 1080 H830"/>
+      <path d="M270 1210 H830"/>
+      <path d="M270 1340 H830"/>
+      <path d="M270 1470 H830"/>
+      <path d="M270 1600 H830"/>
+      <path d="M270 1730 H830"/>
+    </g>
+
+    <!-- subtle lower platform hint -->
+    <path
+      d="M330 1860
+         C395 1842 468 1832 550 1832
+         C632 1832 705 1842 770 1860"
+      stroke="#DCE5EC"
+      stroke-opacity="0.18"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      filter="url(#edgeSoft)"/>
+
+    <!-- gentle contour softeners -->
+    <path
+      d="M400 150 H700"
+      stroke="#FFFFFF"
+      stroke-opacity="0.22"
+      stroke-width="3"
+      stroke-linecap="round"
+      filter="url(#edgeSoft)"/>
+
+    <path
+      d="M400 1950 H700"
+      stroke="#D8E1E9"
+      stroke-opacity="0.18"
+      stroke-width="2.4"
+      stroke-linecap="round"
+      filter="url(#edgeSoft)"/>
+  </g>
+</svg>

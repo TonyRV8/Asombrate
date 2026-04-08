@@ -45,6 +45,19 @@ object ShadowUtils {
     }
 
     /**
+     * Distancia en metros entre dos puntos usando haversine.
+     */
+    fun distanceMeters(a: Location, b: Location): Double {
+        val r = 6371000.0
+        val dLat = Math.toRadians(b.lat - a.lat)
+        val dLng = Math.toRadians(b.lng - a.lng)
+        val lat1 = Math.toRadians(a.lat)
+        val lat2 = Math.toRadians(b.lat)
+        val h = sin(dLat / 2).pow(2.0) + cos(lat1) * cos(lat2) * sin(dLng / 2).pow(2.0)
+        return 2 * r * atan2(sqrt(h), sqrt(1 - h))
+    }
+
+    /**
      * Calcula el rumbo (bearing) entre dos puntos.
      */
     fun calculateBearing(start: Location, end: Location): Double {

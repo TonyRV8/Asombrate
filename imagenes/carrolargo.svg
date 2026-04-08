@@ -1,0 +1,138 @@
+<svg width="1100" height="700" viewBox="0 0 1100 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="700" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7FAFC"/>
+      <stop offset="1" stop-color="#EEF2F6"/>
+    </linearGradient>
+
+    <linearGradient id="bodyFill" x1="250" y1="120" x2="860" y2="590" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F9FBFD" stop-opacity="0.88"/>
+      <stop offset="0.55" stop-color="#EEF3F7" stop-opacity="0.82"/>
+      <stop offset="1" stop-color="#E8EEF3" stop-opacity="0.86"/>
+    </linearGradient>
+
+    <linearGradient id="innerGlow" x1="300" y1="150" x2="820" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#DDE5EC" stop-opacity="0.12"/>
+    </linearGradient>
+
+    <filter id="softBlur" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+
+    <filter id="edgeSoft" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="2.6"/>
+    </filter>
+
+    <filter id="halo" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+  </defs>
+
+  <rect width="1100" height="700" fill="url(#bg)"/>
+
+  <g opacity="0.42" filter="url(#halo)">
+    <rect x="270" y="130" width="560" height="430" rx="88" fill="#F4F8FB"/>
+  </g>
+
+  <g opacity="0.95">
+    <path
+      d="M343 120
+         H757
+         C819 120 851 136 875 166
+         C897 193 905 232 905 286
+         V414
+         C905 468 897 507 875 534
+         C851 564 819 580 757 580
+         H343
+         C281 580 249 564 225 534
+         C203 507 195 468 195 414
+         V286
+         C195 232 203 193 225 166
+         C249 136 281 120 343 120 Z"
+      fill="url(#bodyFill)"
+      filter="url(#softBlur)"/>
+
+    <path
+      d="M343 122
+         H757
+         C818 122 849 138 873 167
+         C894 194 902 232 902 286
+         V414
+         C902 468 894 506 873 533
+         C849 562 818 578 757 578
+         H343
+         C282 578 251 562 227 533
+         C206 506 198 468 198 414
+         V286
+         C198 232 206 194 227 167
+         C251 138 282 122 343 122 Z"
+      fill="url(#bodyFill)"/>
+
+    <path
+      d="M354 143
+         H746
+         C797 143 825 156 845 181
+         C864 205 871 239 871 286
+         V414
+         C871 461 864 495 845 519
+         C825 544 797 557 746 557
+         H354
+         C303 557 275 544 255 519
+         C236 495 229 461 229 414
+         V286
+         C229 239 236 205 255 181
+         C275 156 303 143 354 143 Z"
+      fill="url(#innerGlow)"
+      opacity="0.82"/>
+
+    <path
+      d="M360 166 H740"
+      stroke="#D7E0E8"
+      stroke-opacity="0.32"
+      stroke-width="2"
+      stroke-linecap="round"
+      filter="url(#edgeSoft)"/>
+
+    <path
+      d="M360 534 H740"
+      stroke="#D7E0E8"
+      stroke-opacity="0.28"
+      stroke-width="2"
+      stroke-linecap="round"
+      filter="url(#edgeSoft)"/>
+
+    <path
+      d="M550 146 V554"
+      stroke="#E3EAF0"
+      stroke-opacity="0.18"
+      stroke-width="42"
+      stroke-linecap="round"
+      filter="url(#softBlur)"/>
+
+    <path
+      d="M550 170 V530"
+      stroke="#D9E2EA"
+      stroke-opacity="0.15"
+      stroke-width="1.6"
+      stroke-linecap="round"/>
+
+    <path
+      d="M420 146
+         C432 140 448 136 468 134"
+      stroke="#DCE5EC"
+      stroke-opacity="0.25"
+      stroke-width="2"
+      stroke-linecap="round"
+      filter="url(#edgeSoft)"/>
+
+    <path
+      d="M632 566
+         C652 564 668 560 680 554"
+      stroke="#DCE5EC"
+      stroke-opacity="0.22"
+      stroke-width="2"
+      stroke-linecap="round"
+      filter="url(#edgeSoft)"/>
+  </g>
+</svg>
