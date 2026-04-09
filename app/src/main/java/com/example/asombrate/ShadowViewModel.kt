@@ -1,8 +1,13 @@
 package com.example.asombrate
 
-import androidx.lifecycle.ViewModel
+import android.annotation.SuppressLint
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,12 +23,15 @@ data class LatLng(val lat: Double, val lng: Double)
 
 @OptIn(FlowPreview::class)
 class ShadowViewModel(
+    application: Application,
     private val savedStateHandle: SavedStateHandle
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
     companion object {
         private const val KEY_SELECTED_VEHICLE = "selected_vehicle"
     }
+
+    private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
 
     private val _uiState = MutableStateFlow<ShadowState>(ShadowState.Idle)
     val uiState = _uiState.asStateFlow()
@@ -120,6 +128,40 @@ class ShadowViewModel(
         savedStateHandle[KEY_SELECTED_VEHICLE] = type.name
     }
 
+    // --- Ubicación Actual ---
+
+    @SuppressLint("MissingPermission")
+    fun useCurrentLocation(isOrigin: Boolean) {
+        val stateFlow = if (isOrigin) _originState else _destinationState
+        stateFlow.update { it.copy(isReverseGeocoding = true) }
+        
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            CancellationTokenSource().token
+        ).addOnSuccessListener { location ->
+            if (location != null) {
+                val lat = location.latitude
+                val lng = location.longitude
+                stateFlow.update {
+                    it.copy(
+                        mapLat = lat,
+                        mapLng = lng,
+                        flyToVersion = it.flyToVersion + 1
+                    )
+                }
+                viewModelScope.launch {
+                    reverseGeocode(LatLng(lat, lng), stateFlow)
+                    // Auto-confirmar si es ubicación actual
+                    if (isOrigin) onOriginMapConfirmed() else onDestinationMapConfirmed()
+                }
+            } else {
+                stateFlow.update { it.copy(isReverseGeocoding = false) }
+            }
+        }.addOnFailureListener {
+            stateFlow.update { it.copy(isReverseGeocoding = false) }
+        }
+    }
+
     // --- Búsqueda por texto ---
 
     fun onOriginQueryChanged(text: String) {
@@ -212,6 +254,10 @@ class ShadowViewModel(
         query: String,
         state: MutableStateFlow<LocationFieldState>
     ) {
+        if (query.isBlank()) {
+            state.update { it.copy(suggestions = emptyList(), isSearching = false) }
+            return
+        }
         // Fase 2: cache por query normalizada
         val key = query.trim().lowercase()
         geocodeCache.get(key)?.let { cached ->
@@ -280,6 +326,16 @@ class ShadowViewModel(
             _uiState.value = ShadowState.Error(
                 UiText(R.string.error_confirm_before_calc),
                 ""
+            )
+            return
+        }
+
+        // Validación: si no hay sol a esa hora
+        if (!ShadowUtils.isSunUp(originConfirmed.lat, originConfirmed.lng, selectedCalendar)) {
+            _uiState.value = ShadowState.Error(
+                message = UiText(R.string.error_no_sun_at_night),
+                debugInfo = "",
+                isNightError = true
             )
             return
         }

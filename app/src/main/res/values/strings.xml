@@ -59,6 +59,7 @@
     <string name="error_rate_limit">Demasiadas solicitudes al servidor. Espera unos segundos e inténtalo de nuevo.</string>
     <string name="error_server_5xx">El servicio de rutas está teniendo problemas. Intenta más tarde.</string>
     <string name="error_service_generic">Error del servicio (%1$d).</string>
+    <string name="error_no_sun_at_night">Tranquilo a esa hora no hay sol</string>
 
     <!-- Accesibilidad -->
     <string name="a11y_seat_map_region">Plano de asientos del %1$s. Toca un asiento para seleccionarlo.</string>
@@ -67,6 +68,8 @@
     <string name="a11y_legend_region">Leyenda de estados de asiento</string>
     <string name="a11y_vehicle_selector">Selector de tipo de vehículo</string>
     <string name="a11y_calculate_button">Calcular el lado con más sombra del trayecto</string>
+    <string name="a11y_clear_text">Borrar texto</string>
+    <string name="a11y_my_location">Usar mi ubicación actual</string>
 
     <!-- Estados de asiento -->
     <string name="seat_state_sun">sol directo</string>

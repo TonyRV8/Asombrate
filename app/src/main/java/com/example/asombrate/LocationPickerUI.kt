@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -24,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -62,6 +66,7 @@ fun LocationPickerUI(
     onSuggestionSelected: (LocationSuggestion) -> Unit,
     onMapMoved: (lat: Double, lng: Double) -> Unit,
     onMapConfirmed: () -> Unit,
+    onMyLocationClicked: () -> Unit,
     label: String,
     placeholder: String,
     leadingIcon: ImageVector,
@@ -76,11 +81,28 @@ fun LocationPickerUI(
             placeholder = { Text(placeholder) },
             leadingIcon = { Icon(leadingIcon, contentDescription = null) },
             trailingIcon = {
-                when {
-                    state.isSearching || state.isReverseGeocoding ->
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    state.confirmed != null ->
-                        Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (state.query.isNotEmpty()) {
+                        IconButton(onClick = { onQueryChanged("") }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = stringResource(R.string.a11y_clear_text)
+                            )
+                        }
+                    }
+                    IconButton(onClick = onMyLocationClicked) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = stringResource(R.string.a11y_my_location),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    when {
+                        state.isSearching || state.isReverseGeocoding ->
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        state.confirmed != null ->
+                            Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50))
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth(),

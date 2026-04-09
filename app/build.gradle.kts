@@ -64,11 +64,14 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
 
-    // Solar Calculation (Corregido con la ruta directa)
+    // Solar Calculation
     implementation("org.shredzone.commons:commons-suncalc:3.5")
 
     // Maps - OpenStreetMap
     implementation(libs.osmdroid)
+
+    // Location
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 
     testImplementation(libs.junit)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

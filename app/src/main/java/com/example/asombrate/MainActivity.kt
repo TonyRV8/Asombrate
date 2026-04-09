@@ -1,10 +1,15 @@
 package com.example.asombrate
 
+import android.Manifest
 import android.app.TimePickerDialog
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -31,10 +36,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.asombrate.ui.theme.AsombrateTheme
 import java.util.Calendar
 
@@ -63,6 +68,25 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
     val destinationState by viewModel.destinationState.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     val context = LocalContext.current
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.values.all { it }
+        if (!granted) {
+            Toast.makeText(context, "Se requiere permiso de ubicación", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun checkAndRequestLocation(onGranted: () -> Unit) {
+        val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasFine || hasCoarse) {
+            onGranted()
+        } else {
+            permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -106,6 +130,9 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                         onSuggestionSelected = viewModel::onOriginSelected,
                         onMapMoved = viewModel::onOriginMapMoved,
                         onMapConfirmed = viewModel::onOriginMapConfirmed,
+                        onMyLocationClicked = {
+                            checkAndRequestLocation { viewModel.useCurrentLocation(isOrigin = true) }
+                        },
                         label = stringResource(R.string.label_origin),
                         placeholder = stringResource(R.string.placeholder_origin),
                         leadingIcon = Icons.Default.Home
@@ -117,6 +144,9 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                         onSuggestionSelected = viewModel::onDestinationSelected,
                         onMapMoved = viewModel::onDestinationMapMoved,
                         onMapConfirmed = viewModel::onDestinationMapConfirmed,
+                        onMyLocationClicked = {
+                            checkAndRequestLocation { viewModel.useCurrentLocation(isOrigin = false) }
+                        },
                         label = stringResource(R.string.label_destination),
                         placeholder = stringResource(R.string.placeholder_destination),
                         leadingIcon = Icons.Default.Search
@@ -174,10 +204,10 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                 }
             }
 
-            // Resultados y debug
+            // Resultados
             when (val state = uiState) {
                 is ShadowState.Error -> {
-                    ErrorDebugCard(state.message, state.debugInfo)
+                    ErrorCard(state.message, state.isNightError)
                 }
                 is ShadowState.Success -> {
                     ResultsSection(state.results)
@@ -187,7 +217,6 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                         selectedVehicle = selectedVehicle,
                         onVehicleSelected = viewModel::selectVehicle
                     )
-                    DebugInfoCard(state.debugInfo)
                 }
                 else -> {}
             }
@@ -205,48 +234,30 @@ private fun resolveUiText(text: UiText): String {
 }
 
 @Composable
-fun ErrorDebugCard(message: UiText, debugInfo: String?) {
+fun ErrorCard(message: UiText, isNightError: Boolean) {
+    // Tono Azul Rey para errores nocturnos
+    val containerColor = if (isNightError) Color(0xFF1A237E) else MaterialTheme.colorScheme.errorContainer
+    val contentColor = if (isNightError) Color.White else MaterialTheme.colorScheme.onErrorContainer
+    val iconTint = if (isNightError) Color(0xFFFFD54F) else MaterialTheme.colorScheme.error
+
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = iconTint
+                )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     resolveUiText(message),
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    color = contentColor
                 )
             }
-            if (!debugInfo.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    debugInfo,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun DebugInfoCard(debugInfo: String) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                stringResource(R.string.debug_section_title),
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(debugInfo, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
         }
     }
 }

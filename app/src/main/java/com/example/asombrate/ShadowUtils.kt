@@ -73,6 +73,17 @@ object ShadowUtils {
     }
 
     /**
+     * Determina si el sol está sobre el horizonte.
+     */
+    fun isSunUp(lat: Double, lng: Double, calendar: Calendar): Boolean {
+        val position = SunPosition.compute()
+            .on(calendar)
+            .at(lat, lng)
+            .execute()
+        return position.altitude > 0
+    }
+
+    /**
      * Algoritmo de sombra compatible con SunCalc 3.x
      */
     fun calculateShadowSide(bearing: Double, lat: Double, lng: Double, calendar: Calendar): String? {

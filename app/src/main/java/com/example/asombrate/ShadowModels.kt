@@ -114,6 +114,7 @@ sealed class ShadowState {
     ) : ShadowState()
     data class Error(
         val message: UiText,
-        val debugInfo: String? = null
+        val debugInfo: String? = null,
+        val isNightError: Boolean = false
     ) : ShadowState()
 }
