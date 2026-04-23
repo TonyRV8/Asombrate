@@ -31,10 +31,15 @@ class ShadowViewModel(
         private const val KEY_SELECTED_VEHICLE = "selected_vehicle"
     }
 
-    private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
+    private val fusedLocationClient by lazy {
+        LocationServices.getFusedLocationProviderClient(getApplication<Application>())
+    }
 
     private val _uiState = MutableStateFlow<ShadowState>(ShadowState.Idle)
     val uiState = _uiState.asStateFlow()
+
+    private val _serviceMode = MutableStateFlow(ServiceMode.NORMAL)
+    val serviceMode = _serviceMode.asStateFlow()
 
     private val _originState = MutableStateFlow(LocationFieldState())
     val originState = _originState.asStateFlow()
@@ -69,9 +74,9 @@ class ShadowViewModel(
     // Último punto consultado por reverse para evitar micro-movimientos.
     private var lastOriginReverseAt: LatLng? = null
     private var lastDestinationReverseAt: LatLng? = null
+    private var lastSuccessfulRoutePoints: List<Location>? = null
 
     private var selectedCalendar: Calendar = Calendar.getInstance()
-    private val apiKey = BuildConfig.ORS_API_KEY
 
     init {
         // Debounce búsqueda por texto - Origen
@@ -266,7 +271,11 @@ class ShadowViewModel(
         }
         state.update { it.copy(isSearching = true) }
         try {
-            val response = retryingCall { RetrofitClient.instance.geocode(query, apiKey) }
+            val response = retryingCall {
+                RetrofitClient.instance.geocode(
+                    GeocodeSearchRequest(text = query)
+                )
+            }
             val suggestions = response.features.map { feature ->
                 LocationSuggestion(
                     label = feature.properties.label,
@@ -295,9 +304,10 @@ class ShadowViewModel(
         try {
             val response = retryingCall {
                 RetrofitClient.instance.reverseGeocode(
-                    lat = center.lat,
-                    lon = center.lng,
-                    apiKey = apiKey
+                    ReverseGeocodeRequest(
+                        lat = center.lat,
+                        lon = center.lng
+                    )
                 )
             }
             val label = response.features.firstOrNull()?.properties?.label
@@ -344,8 +354,7 @@ class ShadowViewModel(
             _uiState.value = ShadowState.Loading
             var debugLog = "DEBUG LOG:\n"
             try {
-                debugLog += "Origen: ${originConfirmed.lng},${originConfirmed.lat}\n"
-                debugLog += "Destino: ${destinationConfirmed.lng},${destinationConfirmed.lat}\n"
+                debugLog += "Origen y destino confirmados.\n"
                 val routeKey = buildDirectionsCacheKey(originConfirmed, destinationConfirmed, selectedCalendar)
                 val cachedPoints = directionsCache.get(routeKey)
                 val points = if (cachedPoints != null) {
@@ -353,7 +362,7 @@ class ShadowViewModel(
                     cachedPoints
                 } else run {
                     debugLog += "Ruta cache: MISS\n"
-                    debugLog += "Pidiendo ruta a ORS (POST)...\n"
+                    debugLog += "Pidiendo ruta al backend (POST)...\n"
 
                     val routeRequest = RouteRequest(
                         coordinates = listOf(
@@ -364,13 +373,23 @@ class ShadowViewModel(
 
                     val response = try {
                         retryingCall {
-                            RetrofitClient.instance.getDirections(
-                                apiKey = apiKey,
-                                request = routeRequest
-                            )
+                            val raw = RetrofitClient.instance.getDirections(routeRequest)
+                            if (!raw.isSuccessful) {
+                                throw retrofit2.HttpException(raw)
+                            }
+                            raw
                         }
                     } catch (e: Exception) {
-                        val err = NetworkErrorClassifier.classify(e)
+                        val usageStateHeader = extractUsageStateHeader(e)
+                        val err = NetworkErrorClassifier.classify(e, usageStateHeader)
+                        _serviceMode.value = parseUsageStateHeader(usageStateHeader) ?: err.serviceMode
+
+                        val fallback = lastSuccessfulRoutePoints
+                        if (fallback != null) {
+                            debugLog += "Directions fallo. Reusando ultima ruta valida.\n"
+                            return@run fallback
+                        }
+
                         _uiState.value = ShadowState.Error(
                             err.userMessage,
                             debugLog + err.debugDetail
@@ -378,7 +397,16 @@ class ShadowViewModel(
                         return@launch
                     }
 
-                    val routes = response.routes
+                    _serviceMode.value =
+                        parseUsageStateHeader(response.headers()["X-Usage-State"]) ?: ServiceMode.NORMAL
+
+                    val body = response.body()
+                    if (body == null) {
+                        _uiState.value = ShadowState.Error(UiText(R.string.error_no_route), debugLog)
+                        return@launch
+                    }
+
+                    val routes = body.routes
                     if (routes.isNullOrEmpty()) {
                         _uiState.value = ShadowState.Error(UiText(R.string.error_no_route), debugLog)
                         return@launch
@@ -394,6 +422,7 @@ class ShadowViewModel(
                     directionsCache.put(routeKey, decoded)
                     decoded
                 }
+                lastSuccessfulRoutePoints = points
                 debugLog += "Puntos en ruta: ${points.size}\n"
 
                 _uiState.value = ShadowCalculation.buildSuccess(
@@ -402,13 +431,22 @@ class ShadowViewModel(
                     debugHeader = debugLog
                 )
             } catch (e: Exception) {
-                val err = NetworkErrorClassifier.classify(e)
+                val usageStateHeader = extractUsageStateHeader(e)
+                val err = NetworkErrorClassifier.classify(e, usageStateHeader)
+                _serviceMode.value = parseUsageStateHeader(usageStateHeader) ?: err.serviceMode
                 _uiState.value = ShadowState.Error(
                     err.userMessage,
                     debugLog + "Ex: " + err.debugDetail
                 )
             }
         }
+    }
+
+    private fun extractUsageStateHeader(error: Throwable): String? {
+        return (error as? retrofit2.HttpException)
+            ?.response()
+            ?.headers()
+            ?.get("X-Usage-State")
     }
 
     private fun buildDirectionsCacheKey(

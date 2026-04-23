@@ -11,6 +11,7 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
+val backendBaseUrl = localProperties.getProperty("BACKEND_BASE_URL", "https://your-backend.example.com/")
 
 android {
     namespace = "com.example.asombrate"
@@ -25,7 +26,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "ORS_API_KEY", "\"${localProperties.getProperty("ORS_API_KEY", "")}\"")
+        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
     }
 
     buildTypes {

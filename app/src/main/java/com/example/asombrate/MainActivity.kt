@@ -67,6 +67,7 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
     val originState by viewModel.originState.collectAsState()
     val destinationState by viewModel.destinationState.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val serviceMode by viewModel.serviceMode.collectAsState()
     val context = LocalContext.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -185,6 +186,10 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
                 }
             }
 
+            if (serviceMode != ServiceMode.NORMAL) {
+                ServiceModeCard(serviceMode)
+            }
+
             val calcA11y = stringResource(R.string.a11y_calculate_button)
             Button(
                 onClick = { viewModel.calculateShadow() },
@@ -258,6 +263,45 @@ fun ErrorCard(message: UiText, isNightError: Boolean) {
                     color = contentColor
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun ServiceModeCard(mode: ServiceMode) {
+    val messageRes = when (mode) {
+        ServiceMode.HIGH_USAGE -> R.string.service_mode_high_usage
+        ServiceMode.DEGRADED -> R.string.service_mode_degraded
+        ServiceMode.BLOCK -> R.string.service_mode_quota_exceeded
+        ServiceMode.TEMP_UNAVAILABLE -> R.string.service_mode_temp_unavailable
+        ServiceMode.NORMAL -> return
+    }
+
+    val containerColor = when (mode) {
+        ServiceMode.HIGH_USAGE -> MaterialTheme.colorScheme.tertiaryContainer
+        ServiceMode.DEGRADED,
+        ServiceMode.BLOCK -> MaterialTheme.colorScheme.errorContainer
+        ServiceMode.TEMP_UNAVAILABLE -> MaterialTheme.colorScheme.secondaryContainer
+        ServiceMode.NORMAL -> MaterialTheme.colorScheme.surface
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(messageRes),
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

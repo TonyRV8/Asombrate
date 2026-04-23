@@ -74,10 +74,28 @@ class NetworkErrorClassifierTest {
     }
 
     @Test
-    fun `429 es transitorio y mensaje menciona rate limit`() {
+    fun `429 con BLOCK se trata como cuota agotada`() {
         val e = httpException(429)
         assertTrue(NetworkErrorClassifier.isTransient(e))
-        assertEquals(R.string.error_rate_limit, NetworkErrorClassifier.classify(e).userMessage.resId)
+        val err = NetworkErrorClassifier.classifyHttp(e, "BLOCK")
+        assertEquals(R.string.error_quota_exceeded, err.userMessage.resId)
+        assertEquals(ServiceMode.BLOCK, err.serviceMode)
+    }
+
+    @Test
+    fun `429 con header NORMAL mantiene rate limit generico`() {
+        val e = httpException(429)
+        val err = NetworkErrorClassifier.classifyHttp(e, "NORMAL")
+        assertEquals(R.string.error_rate_limit, err.userMessage.resId)
+        assertEquals(ServiceMode.NORMAL, err.serviceMode)
+    }
+
+    @Test
+    fun `503 con header DEGRADED muestra mensaje degradado amigable`() {
+        val e = httpException(503)
+        val err = NetworkErrorClassifier.classifyHttp(e, "DEGRADED")
+        assertEquals(R.string.error_degraded_mode, err.userMessage.resId)
+        assertEquals(ServiceMode.DEGRADED, err.serviceMode)
     }
 
     @Test
@@ -91,6 +109,29 @@ class NetworkErrorClassifierTest {
         val e = httpException(401)
         assertFalse(NetworkErrorClassifier.isTransient(e))
         assertEquals(R.string.error_auth_api_key, NetworkErrorClassifier.classify(e).userMessage.resId)
+    }
+}
+
+class UsageStateHeaderParserTest {
+
+    @Test
+    fun `parsea NORMAL`() {
+        assertEquals(ServiceMode.NORMAL, parseUsageStateHeader("NORMAL"))
+    }
+
+    @Test
+    fun `parsea HIGH_USAGE`() {
+        assertEquals(ServiceMode.HIGH_USAGE, parseUsageStateHeader("HIGH_USAGE"))
+    }
+
+    @Test
+    fun `parsea DEGRADED`() {
+        assertEquals(ServiceMode.DEGRADED, parseUsageStateHeader("DEGRADED"))
+    }
+
+    @Test
+    fun `parsea BLOCK`() {
+        assertEquals(ServiceMode.BLOCK, parseUsageStateHeader("BLOCK"))
     }
 }
 

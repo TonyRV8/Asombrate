@@ -36,6 +36,17 @@ data class GeocodeProperties(
     @SerializedName("label") val label: String
 )
 
+data class GeocodeSearchRequest(
+    val text: String,
+    val size: Int = 5
+)
+
+data class ReverseGeocodeRequest(
+    val lat: Double,
+    val lon: Double,
+    val size: Int = 1
+)
+
 // Body para el POST de OpenRouteService Directions
 data class RouteRequest(
     val coordinates: List<List<Double>>
@@ -76,6 +87,14 @@ data class LocationFieldState(
 
 /** Nivel de confianza de la recomendación de asiento. */
 enum class RecommendationConfidence { HIGH, MEDIUM, LOW, NONE }
+
+enum class ServiceMode {
+    NORMAL,
+    HIGH_USAGE,
+    DEGRADED,
+    BLOCK,
+    TEMP_UNAVAILABLE
+}
 
 /**
  * Datos estructurados de explicación calculados en el ViewModel

@@ -1,5 +1,6 @@
 package com.example.asombrate
 
+import android.app.Application
 import androidx.lifecycle.SavedStateHandle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -8,13 +9,17 @@ import org.junit.Test
 
 class ShadowViewModelTest {
 
+    private fun newViewModel(handle: SavedStateHandle = SavedStateHandle()): ShadowViewModel {
+        return ShadowViewModel(Application(), handle)
+    }
+
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
     fun `selectVehicle persiste en SavedStateHandle`() {
         val handle = SavedStateHandle()
-        val viewModel = ShadowViewModel(handle)
+        val viewModel = newViewModel(handle)
 
         assertEquals(VehicleType.BUS, viewModel.selectedVehicle.value)
 
@@ -23,13 +28,13 @@ class ShadowViewModelTest {
         assertEquals(VehicleType.CAR, viewModel.selectedVehicle.value)
         assertEquals("CAR", handle.get<String>("selected_vehicle"))
 
-        val restoredViewModel = ShadowViewModel(handle)
+        val restoredViewModel = newViewModel(handle)
         assertEquals(VehicleType.CAR, restoredViewModel.selectedVehicle.value)
     }
 
     @Test
     fun `calculateShadow sin ubicaciones confirmadas emite error localizado`() {
-        val viewModel = ShadowViewModel(SavedStateHandle())
+        val viewModel = newViewModel()
 
         viewModel.calculateShadow()
 

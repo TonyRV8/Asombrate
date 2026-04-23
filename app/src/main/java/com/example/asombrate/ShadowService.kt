@@ -2,41 +2,36 @@ package com.example.asombrate
 
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
+import retrofit2.Response
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
-import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.Headers
 import retrofit2.http.POST
-import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 interface OrsApiService {
-    @POST("v2/directions/driving-car")
+    @POST("directions")
     @Headers("Accept: application/json")
     suspend fun getDirections(
-        @Header("Authorization") apiKey: String,
         @Body request: RouteRequest
-    ): DirectionsResponse
+    ): Response<DirectionsResponse>
 
-    @GET("geocode/search")
+    @POST("geocode")
     suspend fun geocode(
-        @Query("text") text: String,
-        @Query("api_key") apiKey: String,
-        @Query("size") size: Int = 5
+        @Body request: GeocodeSearchRequest
     ): GeocodeResponse
 
-    @GET("geocode/reverse")
+    @POST("reverse-geocode")
     suspend fun reverseGeocode(
-        @Query("point.lat") lat: Double,
-        @Query("point.lon") lon: Double,
-        @Query("api_key") apiKey: String,
-        @Query("size") size: Int = 1
+        @Body request: ReverseGeocodeRequest
     ): GeocodeResponse
 }
 
 object RetrofitClient {
-    private const val BASE_URL = "https://api.openrouteservice.org/"
+    private val BASE_URL: String by lazy {
+        val configured = BuildConfig.BACKEND_BASE_URL.trim()
+        if (configured.endsWith("/")) configured else "$configured/"
+    }
 
     // Fase 2: cliente HTTP con timeouts explícitos y conexión más tolerante.
     // Los reintentos por 429/5xx/timeout se aplican a nivel suspend en el ViewModel

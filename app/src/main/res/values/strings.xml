@@ -57,9 +57,15 @@
     <string name="error_not_found">No se encontró información para esa ubicación.</string>
     <string name="error_http_timeout">El servidor tardó demasiado en responder.</string>
     <string name="error_rate_limit">Demasiadas solicitudes al servidor. Espera unos segundos e inténtalo de nuevo.</string>
+    <string name="error_quota_exceeded">Se alcanzó el límite diario de rutas. Intenta más tarde.</string>
+    <string name="error_degraded_mode">Servicio en modo degradado para proteger la cuota. Intenta nuevamente en unos minutos.</string>
     <string name="error_server_5xx">El servicio de rutas está teniendo problemas. Intenta más tarde.</string>
     <string name="error_service_generic">Error del servicio (%1$d).</string>
     <string name="error_no_sun_at_night">Tranquilo a esa hora no hay sol</string>
+    <string name="service_mode_high_usage">Servicio en uso alto. Las rutas pueden tardar más.</string>
+    <string name="service_mode_degraded">Modo degradado preventivo activo. Se priorizan rutas en caché.</string>
+    <string name="service_mode_quota_exceeded">Se alcanzó el límite diario de rutas. Intenta más tarde.</string>
+    <string name="service_mode_temp_unavailable">Servicio temporalmente no disponible.</string>
 
     <!-- Accesibilidad -->
     <string name="a11y_seat_map_region">Plano de asientos del %1$s. Toca un asiento para seleccionarlo.</string>

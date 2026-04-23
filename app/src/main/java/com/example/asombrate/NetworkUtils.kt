@@ -52,8 +52,22 @@ class TtlCache<K, V>(
     fun size(): Int = map.size
 }
 
-/** Mensaje para el usuario + detalle de debug. */
-data class UserError(val userMessage: UiText, val debugDetail: String)
+/** Mensaje para el usuario + detalle de debug + estado de servicio. */
+data class UserError(
+    val userMessage: UiText,
+    val debugDetail: String,
+    val serviceMode: ServiceMode = ServiceMode.NORMAL
+)
+
+fun parseUsageStateHeader(raw: String?): ServiceMode? {
+    return when (raw?.trim()?.uppercase()) {
+        "NORMAL" -> ServiceMode.NORMAL
+        "HIGH_USAGE" -> ServiceMode.HIGH_USAGE
+        "DEGRADED" -> ServiceMode.DEGRADED
+        "BLOCK" -> ServiceMode.BLOCK
+        else -> null
+    }
+}
 
 /**
  * Clasificador puro de excepciones de red en mensajes entendibles.
@@ -61,39 +75,74 @@ data class UserError(val userMessage: UiText, val debugDetail: String)
  */
 object NetworkErrorClassifier {
 
-    fun classify(t: Throwable): UserError {
+    fun classify(t: Throwable, usageStateHeader: String? = null): UserError {
         return when (t) {
             is SocketTimeoutException -> UserError(
                 UiText(R.string.error_timeout),
-                "Timeout: ${t.message}"
+                "Timeout: ${t.message}",
+                ServiceMode.TEMP_UNAVAILABLE
             )
             is UnknownHostException -> UserError(
                 UiText(R.string.error_no_connection),
-                "UnknownHost: ${t.message}"
+                "UnknownHost: ${t.message}",
+                ServiceMode.TEMP_UNAVAILABLE
             )
-            is HttpException -> classifyHttp(t)
+            is HttpException -> classifyHttp(
+                e = t,
+                usageStateHeader = usageStateHeader ?: t.response()?.headers()?.get("X-Usage-State")
+            )
             is IOException -> UserError(
                 UiText(R.string.error_network_generic),
-                "IO: ${t.message}"
+                "IO: ${t.message}",
+                ServiceMode.TEMP_UNAVAILABLE
             )
             else -> UserError(
                 UiText(R.string.error_unexpected),
-                "${t::class.java.simpleName}: ${t.message}"
+                "${t::class.java.simpleName}: ${t.message}",
+                ServiceMode.NORMAL
             )
         }
     }
 
-    fun classifyHttp(e: HttpException): UserError {
+    fun classifyHttp(e: HttpException, usageStateHeader: String? = null): UserError {
         val code = e.code()
-        val msg = when (code) {
-            401, 403 -> UiText(R.string.error_auth_api_key)
-            404 -> UiText(R.string.error_not_found)
-            408 -> UiText(R.string.error_http_timeout)
-            429 -> UiText(R.string.error_rate_limit)
-            in 500..599 -> UiText(R.string.error_server_5xx)
-            else -> UiText(R.string.error_service_generic, listOf(code))
+        val headerMode = parseUsageStateHeader(usageStateHeader)
+
+        if (headerMode == ServiceMode.BLOCK) {
+            return UserError(
+                UiText(R.string.error_quota_exceeded),
+                "HTTP $code [X-Usage-State=BLOCK]: ${e.message()}",
+                ServiceMode.BLOCK
+            )
         }
-        return UserError(msg, "HTTP $code: ${e.message()}")
+
+        if (headerMode == ServiceMode.DEGRADED) {
+            return UserError(
+                UiText(R.string.error_degraded_mode),
+                "HTTP $code [X-Usage-State=DEGRADED]: ${e.message()}",
+                ServiceMode.DEGRADED
+            )
+        }
+
+        if (headerMode == ServiceMode.NORMAL && code == 429) {
+            return UserError(
+                UiText(R.string.error_rate_limit),
+                "HTTP $code [X-Usage-State=NORMAL]: ${e.message()}",
+                ServiceMode.NORMAL
+            )
+        }
+
+        val (msg, defaultMode) = when (code) {
+            401, 403 -> UiText(R.string.error_auth_api_key) to ServiceMode.NORMAL
+            404 -> UiText(R.string.error_not_found) to ServiceMode.NORMAL
+            408 -> UiText(R.string.error_http_timeout) to ServiceMode.TEMP_UNAVAILABLE
+            429 -> UiText(R.string.error_quota_exceeded) to ServiceMode.BLOCK
+            in 500..599 -> UiText(R.string.error_server_5xx) to ServiceMode.TEMP_UNAVAILABLE
+            else -> UiText(R.string.error_service_generic, listOf(code)) to ServiceMode.NORMAL
+        }
+
+        val mode = headerMode ?: defaultMode
+        return UserError(msg, "HTTP $code: ${e.message()}", mode)
     }
 
     /** ¿Vale la pena reintentar este error? */
