@@ -12,6 +12,10 @@ const ORS_BASE_URL = process.env.ORS_BASE_URL || 'https://api.openrouteservice.o
 const QUOTA_DAILY_SAFE = Number(process.env.RATE_LIMIT_DAILY_SAFE || 1400);
 const QUOTA_PER_MINUTE_SAFE = Number(process.env.RATE_LIMIT_PER_MINUTE_SAFE || 28);
 const DYNAMIC_MINUTE_FACTOR_K = Number(process.env.DYNAMIC_MINUTE_FACTOR_K || 1.4);
+const dynamicMinuteMinLimitRaw = Number(process.env.DYNAMIC_MINUTE_MIN_LIMIT);
+const DYNAMIC_MINUTE_MIN_LIMIT = Number.isFinite(dynamicMinuteMinLimitRaw)
+  ? Math.min(QUOTA_PER_MINUTE_SAFE, Math.max(1, Math.floor(dynamicMinuteMinLimitRaw)))
+  : Math.min(QUOTA_PER_MINUTE_SAFE, Math.max(2, Math.floor(QUOTA_PER_MINUTE_SAFE * 0.5)));
 
 // Operational thresholds based on accumulated daily consumption.
 const THRESHOLD_HIGH_USAGE = Number(process.env.QUOTA_HIGH_USAGE_RATIO || 0.70);
@@ -190,6 +194,10 @@ function buildQuotaSnapshot(nowMs = Date.now()) {
   );
 
   let minuteLimitDynamic = baseMinuteLimit;
+  if (stage === 'NORMAL' || stage === 'HIGH_USAGE') {
+    // Evita bloquear casi todo el trafico al inicio del dia por la formula de pacing.
+    minuteLimitDynamic = Math.max(baseMinuteLimit, DYNAMIC_MINUTE_MIN_LIMIT);
+  }
   if (stage === 'HARDEN') {
     minuteLimitDynamic = Math.max(1, Math.floor(baseMinuteLimit * HARDEN_MINUTE_FACTOR));
   }
@@ -831,6 +839,7 @@ server.listen(PORT, () => {
     dailySafe: QUOTA_DAILY_SAFE,
     minuteSafe: QUOTA_PER_MINUTE_SAFE,
     dynamicFactorK: DYNAMIC_MINUTE_FACTOR_K,
+    dynamicMinuteMinLimit: DYNAMIC_MINUTE_MIN_LIMIT,
     cacheTtlMs: CACHE_TTL_MS,
     maxBodyBytes: MAX_BODY_BYTES,
     ipRateLimitPerMinute: IP_RATE_LIMIT_PER_MINUTE

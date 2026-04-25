@@ -75,6 +75,17 @@ fun parseUsageStateHeader(raw: String?): ServiceMode? {
  */
 object NetworkErrorClassifier {
 
+    private const val PLACEHOLDER_BACKEND_HOST = "your-backend.example.com"
+
+    private fun isBackendBaseUrlMisconfigured(error: UnknownHostException): Boolean {
+        val configuredBackend = BuildConfig.BACKEND_BASE_URL.trim()
+        val message = error.message.orEmpty()
+        if (message.contains(PLACEHOLDER_BACKEND_HOST, ignoreCase = true)) {
+            return true
+        }
+        return message.isBlank() && configuredBackend.contains(PLACEHOLDER_BACKEND_HOST, ignoreCase = true)
+    }
+
     fun classify(t: Throwable, usageStateHeader: String? = null): UserError {
         return when (t) {
             is SocketTimeoutException -> UserError(
@@ -83,8 +94,12 @@ object NetworkErrorClassifier {
                 ServiceMode.TEMP_UNAVAILABLE
             )
             is UnknownHostException -> UserError(
-                UiText(R.string.error_no_connection),
-                "UnknownHost: ${t.message}",
+                if (isBackendBaseUrlMisconfigured(t)) {
+                    UiText(R.string.error_backend_base_url_missing)
+                } else {
+                    UiText(R.string.error_no_connection)
+                },
+                "UnknownHost: ${t.message} [backend=${BuildConfig.BACKEND_BASE_URL}]",
                 ServiceMode.TEMP_UNAVAILABLE
             )
             is HttpException -> classifyHttp(

@@ -28,9 +28,24 @@ interface OrsApiService {
 }
 
 object RetrofitClient {
-    private val BASE_URL: String by lazy {
+    private const val DEFAULT_DEBUG_BACKEND_URL = "http://10.0.2.2:8080/"
+    private const val PLACEHOLDER_BACKEND_HOST = "your-backend.example.com"
+
+    private fun resolveBaseUrl(): String {
         val configured = BuildConfig.BACKEND_BASE_URL.trim()
-        if (configured.endsWith("/")) configured else "$configured/"
+        val looksLikePlaceholder = configured.contains(PLACEHOLDER_BACKEND_HOST, ignoreCase = true)
+
+        val raw = if (BuildConfig.DEBUG && (configured.isBlank() || looksLikePlaceholder)) {
+            DEFAULT_DEBUG_BACKEND_URL
+        } else {
+            configured
+        }
+
+        return if (raw.endsWith("/")) raw else "$raw/"
+    }
+
+    private val BASE_URL: String by lazy {
+        resolveBaseUrl()
     }
 
     // Fase 2: cliente HTTP con timeouts explícitos y conexión más tolerante.

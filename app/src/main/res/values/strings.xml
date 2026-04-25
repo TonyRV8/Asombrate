@@ -49,6 +49,7 @@
     <string name="error_confirm_before_calc">Confirma origen y destino antes de calcular</string>
     <string name="error_no_route">No se encontró ruta</string>
     <string name="error_no_geometry">Respuesta sin geometría</string>
+    <string name="error_backend_base_url_missing">Configura BACKEND_BASE_URL en local.properties antes de usar la app.</string>
     <string name="error_timeout">Tiempo de espera agotado al consultar la ruta. Intenta de nuevo.</string>
     <string name="error_no_connection">Sin conexión a Internet o servicio no disponible.</string>
     <string name="error_network_generic">Problema de red. Revisa tu conexión e inténtalo de nuevo.</string>

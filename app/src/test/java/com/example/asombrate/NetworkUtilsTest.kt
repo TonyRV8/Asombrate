@@ -74,6 +74,13 @@ class NetworkErrorClassifierTest {
     }
 
     @Test
+    fun `unknown host del placeholder indica configuracion faltante`() {
+        val t = UnknownHostException("your-backend.example.com")
+        val err = NetworkErrorClassifier.classify(t)
+        assertEquals(R.string.error_backend_base_url_missing, err.userMessage.resId)
+    }
+
+    @Test
     fun `429 con BLOCK se trata como cuota agotada`() {
         val e = httpException(429)
         assertTrue(NetworkErrorClassifier.isTransient(e))
