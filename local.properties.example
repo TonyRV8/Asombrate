@@ -1,0 +1,10 @@
+sdk.dir=C\\:\\Users\\<tu_usuario>\\AppData\\Local\\Android\\Sdk
+
+# Solo desarrollo local (emulador Android)
+BACKEND_BASE_URL_DEBUG=http://10.0.2.2:8081/
+
+# Produccion release (obligatorio para assembleRelease/bundleRelease)
+BACKEND_BASE_URL_RELEASE=https://tu-backend-publico.com/
+
+# No compartir ni commitear claves reales.
+ORS_API_KEY=coloca_tu_ors_api_key_local

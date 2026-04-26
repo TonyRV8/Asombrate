@@ -11,7 +11,31 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
-val backendBaseUrl = localProperties.getProperty("BACKEND_BASE_URL", "https://your-backend.example.com/")
+
+val backendBaseUrlDebug = localProperties.getProperty(
+    "BACKEND_BASE_URL_DEBUG",
+    localProperties.getProperty("BACKEND_BASE_URL", "http://10.0.2.2:8081/")
+)
+
+val backendBaseUrlRelease = localProperties.getProperty(
+    "BACKEND_BASE_URL_RELEASE",
+    "https://your-backend.example.com/"
+)
+
+val releaseTasksRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+if (releaseTasksRequested) {
+    val invalidReleaseUrl =
+        backendBaseUrlRelease.isBlank() ||
+            backendBaseUrlRelease.contains("your-backend.example.com", ignoreCase = true) ||
+            !backendBaseUrlRelease.startsWith("https://")
+
+    if (invalidReleaseUrl) {
+        throw GradleException(
+            "BACKEND_BASE_URL_RELEASE debe apuntar a tu backend HTTPS real para builds release. " +
+                "Configuralo en local.properties."
+        )
+    }
+}
 
 android {
     namespace = "com.example.asombrate"
@@ -25,13 +49,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrlDebug\"")
+        }
+
         release {
             isMinifyEnabled = false
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrlRelease\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

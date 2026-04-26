@@ -124,12 +124,19 @@ Flujo simplificado:
 - JDK 11.
 - SDK Android con API 36.
 
-## 7. Configuración de ORS API key
+## 7. Configuración local y de producción
 
-La app inyecta la clave por BuildConfig.ORS_API_KEY desde local.properties.
+La app Android consume un backend gateway propio (no llama ORS directo en producción).
 
-1. Crear o editar local.properties en la raíz del proyecto.
-2. Agregar:
+1. Crear o editar `local.properties` en la raíz del proyecto.
+2. Configurar URLs por entorno:
+
+```properties
+BACKEND_BASE_URL_DEBUG=http://10.0.2.2:8081/
+BACKEND_BASE_URL_RELEASE=https://tu-backend-publico.com/
+```
+
+3. Para pruebas locales del backend, la key ORS se carga en el gateway desde entorno o `local.properties`:
 
 ```properties
 ORS_API_KEY=tu_api_key_de_openrouteservice
@@ -137,8 +144,9 @@ ORS_API_KEY=tu_api_key_de_openrouteservice
 
 Importante:
 
-- local.properties está ignorado por git.
-- No hardcodear ni commitear la API key.
+- `local.properties` está ignorado por git.
+- No hardcodear ni commitear API keys.
+- Builds `release` requieren `BACKEND_BASE_URL_RELEASE` con URL HTTPS real.
 
 ## 8. Ejecutar la app
 
