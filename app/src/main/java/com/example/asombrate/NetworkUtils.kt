@@ -2,6 +2,7 @@ package com.example.asombrate
 
 import kotlinx.coroutines.delay
 import retrofit2.HttpException
+import java.net.ConnectException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -86,6 +87,15 @@ object NetworkErrorClassifier {
         return message.isBlank() && configuredBackend.contains(PLACEHOLDER_BACKEND_HOST, ignoreCase = true)
     }
 
+    private fun isBackendUnreachable(error: IOException): Boolean {
+        val msg = error.message.orEmpty()
+        val backend = BuildConfig.BACKEND_BASE_URL.trim()
+        return error is ConnectException ||
+            msg.contains("failed to connect", ignoreCase = true) ||
+            msg.contains("connection refused", ignoreCase = true) ||
+            msg.contains("timeout", ignoreCase = true) && backend.contains("10.0.2.2")
+    }
+
     fun classify(t: Throwable, usageStateHeader: String? = null): UserError {
         return when (t) {
             is SocketTimeoutException -> UserError(
@@ -107,7 +117,11 @@ object NetworkErrorClassifier {
                 usageStateHeader = usageStateHeader ?: t.response()?.headers()?.get("X-Usage-State")
             )
             is IOException -> UserError(
-                UiText(R.string.error_network_generic),
+                if (isBackendUnreachable(t)) {
+                    UiText(R.string.error_backend_unreachable)
+                } else {
+                    UiText(R.string.error_network_generic)
+                },
                 "IO: ${t.message}",
                 ServiceMode.TEMP_UNAVAILABLE
             )

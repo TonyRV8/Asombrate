@@ -1,10 +1,50 @@
 'use strict';
 
+const fs = require('fs');
 const http = require('http');
+const path = require('path');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 8080);
-const ORS_API_KEY = process.env.ORS_API_KEY || '';
+
+function readLocalProperty(propertyName) {
+  try {
+    const localPropertiesPath = path.resolve(__dirname, '..', 'local.properties');
+    if (!fs.existsSync(localPropertiesPath)) {
+      return '';
+    }
+
+    const content = fs.readFileSync(localPropertiesPath, 'utf8');
+    const lines = content.split(/\r?\n/);
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('!')) {
+        continue;
+      }
+
+      const equalIndex = trimmed.indexOf('=');
+      if (equalIndex <= 0) {
+        continue;
+      }
+
+      const key = trimmed.slice(0, equalIndex).trim();
+      if (key !== propertyName) {
+        continue;
+      }
+
+      const rawValue = trimmed.slice(equalIndex + 1).trim();
+      // Support common Java properties escaping used in local.properties files.
+      return rawValue.replace(/\\:/g, ':').replace(/\\\\/g, '\\');
+    }
+  } catch (_err) {
+    return '';
+  }
+
+  return '';
+}
+
+const ORS_API_KEY = process.env.ORS_API_KEY || readLocalProperty('ORS_API_KEY') || '';
 const ORS_BASE_URL = process.env.ORS_BASE_URL || 'https://api.openrouteservice.org';
 
 // Quota baseline (safe budget) for Directions endpoint.

@@ -10,6 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
+import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
@@ -78,6 +79,14 @@ class NetworkErrorClassifierTest {
         val t = UnknownHostException("your-backend.example.com")
         val err = NetworkErrorClassifier.classify(t)
         assertEquals(R.string.error_backend_base_url_missing, err.userMessage.resId)
+    }
+
+    @Test
+    fun `connect exception muestra backend no disponible`() {
+        val t = ConnectException("Failed to connect to /10.0.2.2:8081")
+        val err = NetworkErrorClassifier.classify(t)
+        assertEquals(R.string.error_backend_unreachable, err.userMessage.resId)
+        assertEquals(ServiceMode.TEMP_UNAVAILABLE, err.serviceMode)
     }
 
     @Test
