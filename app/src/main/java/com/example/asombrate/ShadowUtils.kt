@@ -21,8 +21,11 @@ object ShadowUtils {
             var shift = 0
             var result = 0
             do {
+                if (index >= len) {
+                    throw IllegalArgumentException("Polyline truncada en latitud")
+                }
                 b = encoded[index++].code - 63
-                result = result or (b and 0x1f shl shift)
+                result = result or ((b and 0x1f) shl shift)
                 shift += 5
             } while (b >= 0x20)
             val dlat = if (result and 1 != 0) (result shr 1).inv() else result shr 1
@@ -31,8 +34,11 @@ object ShadowUtils {
             shift = 0
             result = 0
             do {
+                if (index >= len) {
+                    throw IllegalArgumentException("Polyline truncada en longitud")
+                }
                 b = encoded[index++].code - 63
-                result = result or (b and 0x1f shl shift)
+                result = result or ((b and 0x1f) shl shift)
                 shift += 5
             } while (b >= 0x20)
             val dlng = if (result and 1 != 0) (result shr 1).inv() else result shr 1
@@ -41,7 +47,6 @@ object ShadowUtils {
             poly.add(Location(lat.toDouble() / 1E5, lng.toDouble() / 1E5))
         }
         return poly
-
     }
 
     /**

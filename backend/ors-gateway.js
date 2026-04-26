@@ -874,6 +874,21 @@ function handleReady(state, res, ctx) {
   });
 }
 
+function handleRoot(state, res, ctx) {
+  respond(res, state, ctx, 200, {
+    status: state.config.orsApiKey ? 'ok' : 'degraded',
+    service: 'asombrate-ors-gateway',
+    message: 'Servicio activo. Usa /healthz para health y /readyz para readiness.',
+    endpoints: {
+      health: '/healthz',
+      ready: '/readyz',
+      directions: '/directions',
+      geocode: '/geocode',
+      reverseGeocode: '/reverse-geocode'
+    }
+  });
+}
+
 function createServer(options = {}) {
   const config = options.config || buildRuntimeConfig(options.env);
   const state = options.state || buildState(config);
@@ -893,6 +908,11 @@ function createServer(options = {}) {
 
     if (ctx.path === '/healthz' && req.method === 'GET') {
       handleHealth(state, res, ctx);
+      return;
+    }
+
+    if (ctx.path === '/' && req.method === 'GET') {
+      handleRoot(state, res, ctx);
       return;
     }
 

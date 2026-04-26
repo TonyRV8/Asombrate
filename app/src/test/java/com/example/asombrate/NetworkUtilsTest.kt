@@ -174,3 +174,19 @@ class MapMoveThresholdTest {
         assertTrue(MapMoveThreshold.shouldTrigger(prev, curr))
     }
 }
+
+class ShadowUtilsPolylineTest {
+
+    @Test
+    fun `decodePolyline decodifica una geometria real larga`() {
+        val geometry = "akfuBl__}QAb@@V~@pCn@Sf@CtAGLFLE\\?lEh@`C`@b@CTGPG`Bo@LER@bAh@H?HE`@_A\\]HM^Wz@e@`AMf@Fl@DdA@NClAWZG`@IzAK^Er@\\V?DIPa@Lm@@c@KaAo@}D_@mBMUS{AYaC[cCOmA@q@BUJKhAO\\IHGLKHUPqAJa@p@m@`@I^E|AMZGd@]T_@f@i@f@e@vCyCXYl@aAp@eBZe@dAu@r@YHCrAc@nA@VFXBX?\\GZM\\YTa@Je@@[A]G[MYMSa@[_@Mc@Ek@]{@}@i@u@Ye@w@}A[]cAyAw@wAoB{Cc@c@iA}BmIsP_AkB}BsEq@kAg@m@q@g@]Ss@[[I[Gw@G[Cq@@aCPeCVsCTm@@u@Aq@Ci@IkAW}GsBoFeBcA_@[QiAw@{@cAm@{@gA}AiByC{CoFmByCiAeBiEmGy@sAoEoK_CwFoAsDcAiCc@cAsAaC{GoKwHcMiD}Fm@aA_A_BaBcEmAoDa@s@[_@k@g@kDiBu@_@u@_@]U{@kA[k@s@yA_@m@c@k@u@y@MSw@_BmAoCc@o@k@i@w@a@e@QaHcB_ASo@Es@?sABw@CYE_@Qu@m@c@e@Y_@OYKWI[G_A?cAJqB?]Cc@OcA}E}OYkAIu@J_E?i@Cc@Ga@iAuEq@sFM}@[iCM{AB{@TwDDqA@iAAy@EqAMyASkBeDkMSaAgA_G{A}Ge@uBMo@Qu@uA_GKg@e@oBUq@aA{CaByD_@aAKWO[q@sA{@}A}BsDyG}LsD{Gm@gAsC_F_ByC}EiJaAmBiA_Ci@oA_@{@O[Sa@Wo@s@}AkAkCQ]w@kBcBwDu@aBS_@_@u@Wg@GSkA_DoB{D{@kBaAkB}C}Gc@cAMe@Ww@wAkEo@aBGOkCqGeAkCe@mA]y@_A{BiAaCYo@c@cBgBcGeA_EMy@Iq@s@}G[}Ba@gDEy@@[BOGEeF}BqCoA_@CsAUSG_Bw@}@k@a@m@Wq@y@eG}@oFCU{@gGmBkN_AkHcAsHy@_GGy@KkAm@sEGi@MmCKa@Sa@q@kBOk@k@qEe@qDw@aFKs@c@sCa@sCSyAS_BS{A_@oCk@iESaBOaBBaCPeHFyBNsF?M\\iJTcDB]B_@h@qHBYV{DF}@RiDdAmPb@oHN}B_FY}D[OAgCQoDWuCU_BOiBOiDYgD[aCS]CK@WvD"
+
+        val points = ShadowUtils.decodePolyline(geometry)
+
+        assertTrue(points.size > 100)
+        assertEquals(19.3711, points.first().lat, 0.001)
+        assertEquals(-99.2871, points.first().lng, 0.001)
+        assertEquals(19.43282, points.last().lat, 0.01)
+        assertEquals(-99.1373, points.last().lng, 0.01)
+    }
+}

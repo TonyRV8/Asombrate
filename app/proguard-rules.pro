@@ -20,12 +20,30 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
--keepattributes Signature,*Annotation*
+-keepattributes Signature,InnerClasses,EnclosingMethod,*Annotation*
+-keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations,AnnotationDefault
+
+-keep class kotlin.Metadata { *; }
+
+-keep interface com.example.asombrate.OrsApiService { *; }
+
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+
+-keep,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+
+-dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
 
 -keep class com.example.asombrate.GeocodeResponse { *; }
 -keep class com.example.asombrate.GeocodeFeature { *; }
 -keep class com.example.asombrate.GeocodeGeometry { *; }
 -keep class com.example.asombrate.GeocodeProperties { *; }
+-keep class com.example.asombrate.GeocodeSearchRequest { *; }
+-keep class com.example.asombrate.ReverseGeocodeRequest { *; }
+-keep class com.example.asombrate.RouteRequest { *; }
 -keep class com.example.asombrate.DirectionsResponse { *; }
 -keep class com.example.asombrate.RouteItem { *; }
 

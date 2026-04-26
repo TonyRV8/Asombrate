@@ -41,6 +41,20 @@ test('GET /healthz exposes operational state without leaking secrets', async () 
   }
 });
 
+test('GET / returns 200 with endpoint hints', async () => {
+  const { server, baseUrl } = await startTestServer();
+
+  try {
+    const { response, payload } = await request(baseUrl, '/');
+    assert.equal(response.status, 200);
+    assert.equal(payload.service, 'asombrate-ors-gateway');
+    assert.equal(payload.endpoints.health, '/healthz');
+    assert.equal(payload.endpoints.ready, '/readyz');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('GET /readyz returns 503 when ORS_API_KEY is missing', async () => {
   const server = createServer({ env: { ORS_API_KEY: '' } });
   server.listen(0);

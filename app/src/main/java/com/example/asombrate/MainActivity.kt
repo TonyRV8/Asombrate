@@ -216,7 +216,7 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
             // Resultados
             when (val state = uiState) {
                 is ShadowState.Error -> {
-                    ErrorCard(state.message, state.isNightError)
+                    ErrorCard(state.message, state.debugInfo, state.isNightError)
                 }
                 is ShadowState.Success -> {
                     ResultsSection(state.results)
@@ -244,6 +244,11 @@ fun resolveUiText(text: UiText): String {
 
 @Composable
 fun ErrorCard(message: UiText, isNightError: Boolean) {
+    ErrorCard(message, null, isNightError)
+}
+
+@Composable
+fun ErrorCard(message: UiText, debugInfo: String?, isNightError: Boolean) {
     // Tono Azul Rey para errores nocturnos
     val containerColor = if (isNightError) Color(0xFF1A237E) else MaterialTheme.colorScheme.errorContainer
     val contentColor = if (isNightError) Color.White else MaterialTheme.colorScheme.onErrorContainer
@@ -265,6 +270,14 @@ fun ErrorCard(message: UiText, isNightError: Boolean) {
                     resolveUiText(message),
                     fontWeight = FontWeight.Bold,
                     color = contentColor
+                )
+            }
+            if (BuildConfig.INTERNAL_TEST_BUILD && !debugInfo.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    debugInfo,
+                    color = contentColor,
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }

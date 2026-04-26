@@ -1,9 +1,9 @@
 package com.example.asombrate
 
+import androidx.annotation.Keep
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
-import retrofit2.Response
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Headers
@@ -11,12 +11,13 @@ import retrofit2.http.POST
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
+@Keep
 interface OrsApiService {
     @POST("directions")
     @Headers("Accept: application/json")
     suspend fun getDirections(
         @Body request: RouteRequest
-    ): Response<DirectionsResponse>
+    ): DirectionsResponse
 
     @POST("geocode")
     suspend fun geocode(
@@ -35,6 +36,8 @@ object RetrofitClient {
         "your-backend.example.com",
         "tu-backend-publico.com"
     )
+    @Volatile
+    private var lastUsageStateHeader: String? = null
 
     private fun isPlaceholderHost(raw: String): Boolean {
         return placeholderHosts.any { raw.contains(it, ignoreCase = true) }
@@ -101,7 +104,9 @@ object RetrofitClient {
                         )
                         .header("X-Asombrate-App-Version", BuildConfig.VERSION_NAME)
                         .build()
-                    chain.proceed(request)
+                    val response = chain.proceed(request)
+                    lastUsageStateHeader = response.header("X-Usage-State")
+                    response
                 }
             )
             .build()
@@ -114,5 +119,11 @@ object RetrofitClient {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(OrsApiService::class.java)
+    }
+
+    fun consumeLastUsageStateHeader(): String? {
+        val value = lastUsageStateHeader
+        lastUsageStateHeader = null
+        return value
     }
 }

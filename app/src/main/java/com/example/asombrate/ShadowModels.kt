@@ -1,5 +1,6 @@
 package com.example.asombrate
 
+import androidx.annotation.Keep
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.annotation.StringRes
@@ -19,44 +20,53 @@ data class ShadowResult(
 )
 
 // Modelos para Geocoding de OpenRouteService
+@Keep
 data class GeocodeResponse(
-    @SerializedName("features") val features: List<GeocodeFeature>
+    @SerializedName("features") val features: List<GeocodeFeature>? = emptyList()
 )
 
+@Keep
 data class GeocodeFeature(
-    @SerializedName("geometry") val geometry: GeocodeGeometry,
-    @SerializedName("properties") val properties: GeocodeProperties
+    @SerializedName("geometry") val geometry: GeocodeGeometry? = null,
+    @SerializedName("properties") val properties: GeocodeProperties? = null
 )
 
+@Keep
 data class GeocodeGeometry(
-    @SerializedName("coordinates") val coordinates: List<Double>
+    @SerializedName("coordinates") val coordinates: List<Double>? = emptyList()
 )
 
+@Keep
 data class GeocodeProperties(
-    @SerializedName("label") val label: String
+    @SerializedName("label") val label: String? = null
 )
 
+@Keep
 data class GeocodeSearchRequest(
-    val text: String,
-    val size: Int = 5
+    @SerializedName("text") val text: String,
+    @SerializedName("size") val size: Int = 5
 )
 
+@Keep
 data class ReverseGeocodeRequest(
-    val lat: Double,
-    val lon: Double,
-    val size: Int = 1
+    @SerializedName("lat") val lat: Double,
+    @SerializedName("lon") val lon: Double,
+    @SerializedName("size") val size: Int = 1
 )
 
 // Body para el POST de OpenRouteService Directions
+@Keep
 data class RouteRequest(
-    val coordinates: List<List<Double>>
+    @SerializedName("coordinates") val coordinates: List<List<Double>>
 )
 
 // Data Classes estrictas para OpenRouteService Directions
+@Keep
 data class DirectionsResponse(
     @SerializedName("routes") val routes: List<RouteItem>?
 )
 
+@Keep
 data class RouteItem(
     @SerializedName("geometry") val geometry: String?
 )

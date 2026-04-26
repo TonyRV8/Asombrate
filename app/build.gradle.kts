@@ -76,16 +76,26 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrlDebug\"")
+            buildConfigField("boolean", "INTERNAL_TEST_BUILD", "true")
         }
 
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrlRelease\"")
+            buildConfigField("boolean", "INTERNAL_TEST_BUILD", "false")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+
+        create("releaseTest") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            versionNameSuffix = "-release-test"
+            buildConfigField("boolean", "INTERNAL_TEST_BUILD", "true")
         }
     }
     compileOptions {

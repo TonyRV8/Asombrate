@@ -361,12 +361,21 @@ class ShadowViewModel(
                     GeocodeSearchRequest(text = query)
                 )
             }
-            val suggestions = response.features.map { feature ->
-                LocationSuggestion(
-                    label = feature.properties.label,
-                    lat = feature.geometry.coordinates[1],
-                    lng = feature.geometry.coordinates[0]
-                )
+            val suggestions = response.features.orEmpty().mapNotNull { feature ->
+                val coordinates = feature.geometry?.coordinates
+                val lat = coordinates?.getOrNull(1)
+                val lng = coordinates?.getOrNull(0)
+                val label = feature.properties?.label?.takeIf { it.isNotBlank() }
+
+                if (label == null || lat == null || lng == null) {
+                    null
+                } else {
+                    LocationSuggestion(
+                        label = label,
+                        lat = lat,
+                        lng = lng
+                    )
+                }
             }
             geocodeCache.put(key, suggestions)
             state.update {
@@ -418,7 +427,7 @@ class ShadowViewModel(
                     )
                 )
             }
-            val label = response.features.firstOrNull()?.properties?.label
+            val label = response.features.orEmpty().firstOrNull()?.properties?.label
                 ?: "%.5f, %.5f".format(center.lat, center.lng)
             reverseGeocodeCache.put(key, label)
             state.update {
@@ -489,11 +498,7 @@ class ShadowViewModel(
 
                     val response = try {
                         retryingCall {
-                            val raw = RetrofitClient.instance.getDirections(routeRequest)
-                            if (!raw.isSuccessful) {
-                                throw retrofit2.HttpException(raw)
-                            }
-                            raw
+                            RetrofitClient.instance.getDirections(routeRequest)
                         }
                     } catch (e: Exception) {
                         val usageStateHeader = extractUsageStateHeader(e)
@@ -514,15 +519,9 @@ class ShadowViewModel(
                     }
 
                     _serviceMode.value =
-                        parseUsageStateHeader(response.headers()["X-Usage-State"]) ?: ServiceMode.NORMAL
+                        parseUsageStateHeader(RetrofitClient.consumeLastUsageStateHeader()) ?: ServiceMode.NORMAL
 
-                    val body = response.body()
-                    if (body == null) {
-                        _uiState.value = ShadowState.Error(UiText(R.string.error_no_route), debugLog)
-                        return@launch
-                    }
-
-                    val routes = body.routes
+                    val routes = response.routes
                     if (routes.isNullOrEmpty()) {
                         _uiState.value = ShadowState.Error(UiText(R.string.error_no_route), debugLog)
                         return@launch
