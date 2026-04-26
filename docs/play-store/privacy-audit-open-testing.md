@@ -1,63 +1,43 @@
 # Privacy Audit - Open Testing (Asombrate)
 
-Date: 2026-04-21
+Date: 2026-04-25
 Scope: Android app + backend ORS proxy used by the app.
 
 ## 1) Data the app uses
 
-- Origin and destination entered by the user (text or map pin).
-- Optional current device location only when the user taps "usar mi ubicacion actual".
+- Origin and destination entered by the user.
+- Optional current location when the user taps "usar mi ubicacion actual".
 - Departure time selected by the user.
-- Vehicle type selected by the user (car or bus).
-- Route/geocode responses required to compute seat-side recommendation.
-
-Use purpose: app functionality only (route calculation + sun/shade recommendation).
+- Vehicle type selected by the user.
+- Route/geocode responses required to compute the recommendation.
 
 ## 2) Data the app does NOT collect
 
-- No account data (no name, email, phone, password).
+- No accounts, email, phone or password.
 - No payment data.
-- No contacts, photos, files, messages, or microphone/camera data.
-- No advertising identifiers usage for profiling.
-- No analytics SDKs or behavior tracking SDKs in current dependencies.
+- No contacts, photos, files, camera or microphone data.
+- No advertising identifiers for profiling.
+- No analytics SDKs in current dependencies.
 
-## 3) Account and tracking posture
+## 3) Retention posture
 
-- No login, no user account, no registration flow.
-- No invasive behavior tracking.
-- No ad-tech telemetry.
+- No persistent location history database.
+- App caches are in-memory TTL only.
+- Android backup and data extraction are disabled.
 
-## 4) Location retention and persistence
+## 4) Third-party services
 
-- No persistent location history database in the app.
-- Route/geocode caches are in-memory TTL only and are lost when the app process ends.
-- Small UI state persistence is limited to selected vehicle type via SavedStateHandle.
-- Android backup is disabled (allowBackup=false) to reduce unintended persistence risk.
+- Project backend proxy.
+- OpenRouteService via backend.
+- Map tiles via osmdroid/OpenStreetMap infrastructure.
 
-## 5) Technical logging and PII
+## 5) Hardening now present
 
-- Android app does not use Log/Timber analytics logging pipelines for user tracking.
-- Debug info used for UI state has been minimized to avoid raw coordinates.
-- Backend operational logs are structured and focused on quota/counter status.
-- Backend keeps in-memory IP rate-limit counters for abuse protection only; no long-term user profile storage is implemented in this repo.
+- Release blocks cleartext traffic.
+- Release rejects placeholder or localhost backend URLs.
+- Health endpoint does not expose secrets.
+- Backend adds request IDs and security headers.
 
-## 6) Third-party services usage
+## 6) Conclusion
 
-- Route/geocode are processed through the project backend proxy, which calls OpenRouteService.
-- Map tiles/search functionality rely on map/routing providers only for core app function.
-- No third-party marketing/ads SDK integration found.
-
-## 7) Consistency checks and minimal fixes applied
-
-- Privacy hardening applied:
-  - AndroidManifest switched to allowBackup=false.
-  - ShadowViewModel debug text no longer includes exact origin/destination coordinates.
-
-## 8) Open Testing readiness conclusion
-
-Current implementation is consistent with a privacy-by-design posture for Open Testing:
-
-- Minimal data usage for core functionality.
-- No account system.
-- No invasive tracking.
-- No unnecessary persistent location history.
+Current implementation is aligned with privacy-by-design expectations for Open Testing and a first production rollout.

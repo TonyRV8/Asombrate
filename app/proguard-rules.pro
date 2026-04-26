@@ -19,3 +19,15 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+-keepattributes Signature,*Annotation*
+
+-keep class com.example.asombrate.GeocodeResponse { *; }
+-keep class com.example.asombrate.GeocodeFeature { *; }
+-keep class com.example.asombrate.GeocodeGeometry { *; }
+-keep class com.example.asombrate.GeocodeProperties { *; }
+-keep class com.example.asombrate.DirectionsResponse { *; }
+-keep class com.example.asombrate.RouteItem { *; }
+
+-keep class org.osmdroid.** { *; }
+-dontwarn org.osmdroid.**

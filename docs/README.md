@@ -14,8 +14,10 @@ Use these files for Play Console/Data Safety/privacy review:
 
 Use these files to run release readiness and manual validation:
 
+- docs/release/play-store-production-runbook.md
 - docs/release/open-testing-release-checklist.md
 - docs/release/smoke-checklist-backend-android.md
+- docs/backend/operations.md
 
 ## Portfolio and CV package
 

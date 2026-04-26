@@ -82,7 +82,9 @@ data class LocationFieldState(
     val mapLat: Double = 19.4326,   // Default: CDMX centro
     val mapLng: Double = -99.1332,
     val isReverseGeocoding: Boolean = false,
-    val flyToVersion: Int = 0       // Se incrementa para indicar animación programática
+    val flyToVersion: Int = 0,      // Se incrementa para indicar animación programática
+    val statusMessage: UiText? = null,
+    val statusMessageIsError: Boolean = false
 )
 
 /** Nivel de confianza de la recomendación de asiento. */

@@ -75,7 +75,11 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
     ) { permissions ->
         val granted = permissions.values.all { it }
         if (!granted) {
-            Toast.makeText(context, "Se requiere permiso de ubicación", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                context.getString(R.string.error_location_permission_required),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -230,7 +234,7 @@ fun ShadowCalculatorScreen(viewModel: ShadowViewModel) {
 }
 
 @Composable
-private fun resolveUiText(text: UiText): String {
+fun resolveUiText(text: UiText): String {
     return if (text.formatArgs.isEmpty()) {
         stringResource(text.resId)
     } else {

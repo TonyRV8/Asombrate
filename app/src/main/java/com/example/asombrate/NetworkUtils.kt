@@ -6,6 +6,7 @@ import java.net.ConnectException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import javax.net.ssl.SSLException
 import kotlin.math.min
 import kotlin.math.pow
 
@@ -76,15 +77,20 @@ fun parseUsageStateHeader(raw: String?): ServiceMode? {
  */
 object NetworkErrorClassifier {
 
-    private const val PLACEHOLDER_BACKEND_HOST = "your-backend.example.com"
+    private val placeholderBackendHosts = listOf(
+        "your-backend.example.com",
+        "tu-backend-publico.com"
+    )
 
     private fun isBackendBaseUrlMisconfigured(error: UnknownHostException): Boolean {
         val configuredBackend = BuildConfig.BACKEND_BASE_URL.trim()
         val message = error.message.orEmpty()
-        if (message.contains(PLACEHOLDER_BACKEND_HOST, ignoreCase = true)) {
+        if (placeholderBackendHosts.any { message.contains(it, ignoreCase = true) }) {
             return true
         }
-        return message.isBlank() && configuredBackend.contains(PLACEHOLDER_BACKEND_HOST, ignoreCase = true)
+        return message.isBlank() && placeholderBackendHosts.any {
+            configuredBackend.contains(it, ignoreCase = true)
+        }
     }
 
     private fun isBackendUnreachable(error: IOException): Boolean {
@@ -101,6 +107,11 @@ object NetworkErrorClassifier {
             is SocketTimeoutException -> UserError(
                 UiText(R.string.error_timeout),
                 "Timeout: ${t.message}",
+                ServiceMode.TEMP_UNAVAILABLE
+            )
+            is SSLException -> UserError(
+                UiText(R.string.error_secure_connection),
+                "SSL: ${t.message}",
                 ServiceMode.TEMP_UNAVAILABLE
             )
             is UnknownHostException -> UserError(
@@ -177,6 +188,7 @@ object NetworkErrorClassifier {
     /** ¿Vale la pena reintentar este error? */
     fun isTransient(t: Throwable): Boolean = when (t) {
         is SocketTimeoutException -> true
+        is SSLException -> false
         is UnknownHostException -> false
         is HttpException -> {
             val c = t.code()

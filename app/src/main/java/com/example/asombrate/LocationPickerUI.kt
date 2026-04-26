@@ -79,6 +79,7 @@ fun LocationPickerUI(
             onValueChange = onQueryChanged,
             label = { Text(label) },
             placeholder = { Text(placeholder) },
+            isError = state.statusMessageIsError,
             leadingIcon = { Icon(leadingIcon, contentDescription = null) },
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -106,7 +107,19 @@ fun LocationPickerUI(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            supportingText = {
+                state.statusMessage?.let { message ->
+                    Text(
+                        text = resolveUiText(message),
+                        color = if (state.statusMessageIsError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            }
         )
 
         // Lista de sugerencias de texto

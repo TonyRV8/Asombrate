@@ -1,6 +1,6 @@
 # Privacy Policy Draft - Asombrate
 
-Effective date: TODO (set before public release)
+Effective date: TODO_SET_PUBLIC_DATE
 
 ## 1) What the app does
 
@@ -8,13 +8,11 @@ Asombrate helps users choose the best seat side to reduce sun exposure during a 
 
 ## 2) Data used to provide functionality
 
-The app uses, only as needed for route and recommendation:
-
 - Origin and destination entered by the user.
 - Optional current location when the user explicitly requests it.
 - Departure time and selected vehicle type.
 
-This data is used to request route/geocode services and compute the recommendation.
+This data is used only to obtain route/geocode results and compute the recommendation.
 
 ## 3) No accounts or registration
 
@@ -25,30 +23,27 @@ This data is used to request route/geocode services and compute the recommendati
 
 - We do not sell personal information.
 
-## 5) No behavior tracking for marketing
+## 5) No marketing tracking
 
 - The app does not include ad-tech trackers.
-- The app does not profile user behavior for advertising.
+- The app does not profile behavior for advertising.
 
 ## 6) Third-party services
 
-The app uses third-party infrastructure only to deliver map/routing functionality:
-
 - Project backend proxy for routing operations.
-- Routing/map providers used by that backend and map components.
+- Routing and map providers required for functionality.
 
-These services may process network metadata needed to deliver requests (for example, IP at transport level), under their own policies.
+These services may process transport metadata needed to answer requests.
 
-## 7) Retention approach
+## 7) Retention
 
-- No account profile storage is implemented.
 - No persistent location history is stored by the app.
-- Temporary in-memory caches may exist only to reduce repeated requests during active usage.
+- Temporary in-memory caches may exist during active use.
 
-## 8) Security approach
+## 8) Security
 
-- Secrets are managed on backend side; client app does not embed ORS API keys.
-- Release configuration should use HTTPS backend endpoints.
+- Secrets stay on backend side.
+- Release app uses HTTPS backend endpoints.
 
 ## 9) Contact
 

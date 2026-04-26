@@ -54,6 +54,7 @@
     <string name="error_backend_unreachable">No se pudo conectar al backend. Verifica que el gateway esté encendido.</string>
     <string name="error_no_connection">Sin conexión a Internet o servicio no disponible.</string>
     <string name="error_network_generic">Problema de red. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="error_secure_connection">No se pudo establecer una conexión segura con el servidor.</string>
     <string name="error_unexpected">Ocurrió un error inesperado al calcular la ruta.</string>
     <string name="error_auth_api_key">API key inválida o sin permisos para este servicio.</string>
     <string name="error_not_found">No se encontró información para esa ubicación.</string>
@@ -64,6 +65,9 @@
     <string name="error_server_5xx">El servicio de rutas está teniendo problemas. Intenta más tarde.</string>
     <string name="error_service_generic">Error del servicio (%1$d).</string>
     <string name="error_no_sun_at_night">Tranquilo a esa hora no hay sol</string>
+    <string name="error_location_permission_required">Se necesita permiso de ubicación para usar esta función.</string>
+    <string name="error_location_unavailable">No se pudo obtener tu ubicación actual.</string>
+    <string name="error_reverse_geocode_temporarily_unavailable">No se pudo actualizar la dirección del mapa en este momento.</string>
     <string name="service_mode_high_usage">Servicio en uso alto. Las rutas pueden tardar más.</string>
     <string name="service_mode_degraded">Modo degradado preventivo activo. Se priorizan rutas en caché.</string>
     <string name="service_mode_quota_exceeded">Se alcanzó el límite diario de rutas. Intenta más tarde.</string>

@@ -5,8 +5,6 @@ const http = require('http');
 const path = require('path');
 const { URL } = require('url');
 
-const PORT = Number(process.env.PORT || 8080);
-
 function readLocalProperty(propertyName) {
   try {
     const localPropertiesPath = path.resolve(__dirname, '..', 'local.properties');
@@ -34,7 +32,6 @@ function readLocalProperty(propertyName) {
       }
 
       const rawValue = trimmed.slice(equalIndex + 1).trim();
-      // Support common Java properties escaping used in local.properties files.
       return rawValue.replace(/\\:/g, ':').replace(/\\\\/g, '\\');
     }
   } catch (_err) {
@@ -44,40 +41,46 @@ function readLocalProperty(propertyName) {
   return '';
 }
 
-const ORS_API_KEY = process.env.ORS_API_KEY || readLocalProperty('ORS_API_KEY') || '';
-const ORS_BASE_URL = process.env.ORS_BASE_URL || 'https://api.openrouteservice.org';
+function numberFromEnv(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 
-// Quota baseline (safe budget) for Directions endpoint.
-// D = daily quota, M = per-minute quota, k = dynamic factor.
-const QUOTA_DAILY_SAFE = Number(process.env.RATE_LIMIT_DAILY_SAFE || 1400);
-const QUOTA_PER_MINUTE_SAFE = Number(process.env.RATE_LIMIT_PER_MINUTE_SAFE || 28);
-const DYNAMIC_MINUTE_FACTOR_K = Number(process.env.DYNAMIC_MINUTE_FACTOR_K || 1.4);
-const dynamicMinuteMinLimitRaw = Number(process.env.DYNAMIC_MINUTE_MIN_LIMIT);
-const DYNAMIC_MINUTE_MIN_LIMIT = Number.isFinite(dynamicMinuteMinLimitRaw)
-  ? Math.min(QUOTA_PER_MINUTE_SAFE, Math.max(1, Math.floor(dynamicMinuteMinLimitRaw)))
-  : Math.min(QUOTA_PER_MINUTE_SAFE, Math.max(2, Math.floor(QUOTA_PER_MINUTE_SAFE * 0.5)));
+function buildRuntimeConfig(env = process.env) {
+  const quotaPerMinuteSafe = numberFromEnv(env.RATE_LIMIT_PER_MINUTE_SAFE, 28);
+  const dynamicMinuteMinLimitRaw = Number(env.DYNAMIC_MINUTE_MIN_LIMIT);
+  const orsApiKey = Object.prototype.hasOwnProperty.call(env, 'ORS_API_KEY')
+    ? String(env.ORS_API_KEY || '')
+    : (process.env.ORS_API_KEY || readLocalProperty('ORS_API_KEY') || '');
 
-// Operational thresholds based on accumulated daily consumption.
-const THRESHOLD_HIGH_USAGE = Number(process.env.QUOTA_HIGH_USAGE_RATIO || 0.70);
-const THRESHOLD_HARDEN = Number(process.env.QUOTA_HARDEN_RATIO || 0.85);
-const THRESHOLD_DEGRADED = Number(process.env.QUOTA_DEGRADED_RATIO || 0.95);
-const THRESHOLD_BLOCK = Number(process.env.QUOTA_BLOCK_RATIO || 1.00);
-const HARDEN_MINUTE_FACTOR = Number(process.env.HARDEN_MINUTE_FACTOR || 0.70);
-
-// Cache tunables.
-const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 10 * 60 * 1000);
-const CACHE_MAX_DIRECTIONS = Number(process.env.CACHE_MAX_DIRECTIONS || 300);
-const CACHE_MAX_GEOCODE = Number(process.env.CACHE_MAX_GEOCODE || 500);
-const CACHE_MAX_REVERSE = Number(process.env.CACHE_MAX_REVERSE || 500);
-
-const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 15_000);
-
-// Abuse protection tunables.
-const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 32 * 1024);
-const IP_RATE_LIMIT_PER_MINUTE = Number(process.env.IP_RATE_LIMIT_PER_MINUTE || 120);
-const MAX_COORDINATE_PAIRS = Number(process.env.MAX_COORDINATE_PAIRS || 16);
-const MAX_GEOCODE_TEXT_LENGTH = Number(process.env.MAX_GEOCODE_TEXT_LENGTH || 200);
-const MAX_ROUTE_DISTANCE_KM = Number(process.env.MAX_ROUTE_DISTANCE_KM || 5000);
+  return {
+    port: numberFromEnv(env.PORT, 8080),
+    orsApiKey,
+    orsBaseUrl: env.ORS_BASE_URL || 'https://api.openrouteservice.org',
+    quotaDailySafe: numberFromEnv(env.RATE_LIMIT_DAILY_SAFE, 1400),
+    quotaPerMinuteSafe,
+    dynamicMinuteFactorK: numberFromEnv(env.DYNAMIC_MINUTE_FACTOR_K, 1.4),
+    dynamicMinuteMinLimit: Number.isFinite(dynamicMinuteMinLimitRaw)
+      ? Math.min(quotaPerMinuteSafe, Math.max(1, Math.floor(dynamicMinuteMinLimitRaw)))
+      : Math.min(quotaPerMinuteSafe, Math.max(2, Math.floor(quotaPerMinuteSafe * 0.5))),
+    thresholdHighUsage: numberFromEnv(env.QUOTA_HIGH_USAGE_RATIO, 0.70),
+    thresholdHarden: numberFromEnv(env.QUOTA_HARDEN_RATIO, 0.85),
+    thresholdDegraded: numberFromEnv(env.QUOTA_DEGRADED_RATIO, 0.95),
+    thresholdBlock: numberFromEnv(env.QUOTA_BLOCK_RATIO, 1.00),
+    hardenMinuteFactor: numberFromEnv(env.HARDEN_MINUTE_FACTOR, 0.70),
+    cacheTtlMs: numberFromEnv(env.CACHE_TTL_MS, 10 * 60 * 1000),
+    cacheMaxDirections: numberFromEnv(env.CACHE_MAX_DIRECTIONS, 300),
+    cacheMaxGeocode: numberFromEnv(env.CACHE_MAX_GEOCODE, 500),
+    cacheMaxReverse: numberFromEnv(env.CACHE_MAX_REVERSE, 500),
+    requestTimeoutMs: numberFromEnv(env.REQUEST_TIMEOUT_MS, 15_000),
+    maxBodyBytes: numberFromEnv(env.MAX_BODY_BYTES, 32 * 1024),
+    ipRateLimitPerMinute: numberFromEnv(env.IP_RATE_LIMIT_PER_MINUTE, 120),
+    maxCoordinatePairs: numberFromEnv(env.MAX_COORDINATE_PAIRS, 16),
+    maxGeocodeTextLength: numberFromEnv(env.MAX_GEOCODE_TEXT_LENGTH, 200),
+    maxRouteDistanceKm: numberFromEnv(env.MAX_ROUTE_DISTANCE_KM, 5000),
+    corsAllowOrigin: env.CORS_ALLOW_ORIGIN || '*'
+  };
+}
 
 const QUOTA_ERROR_PAYLOAD = {
   error: 'QUOTA_EXCEEDED',
@@ -103,7 +106,6 @@ class TtlCache {
       this.map.delete(key);
       return null;
     }
-    // Lightweight LRU refresh.
     this.map.delete(key);
     this.map.set(key, entry);
     return entry.value;
@@ -116,57 +118,52 @@ class TtlCache {
     }
     this.map.set(key, { value, expiresAt: Date.now() + this.ttlMs });
   }
+
+  size() {
+    return this.map.size;
+  }
 }
 
-const directionsCache = new TtlCache(CACHE_TTL_MS, CACHE_MAX_DIRECTIONS);
-const geocodeCache = new TtlCache(CACHE_TTL_MS, CACHE_MAX_GEOCODE);
-const reverseGeocodeCache = new TtlCache(CACHE_TTL_MS, CACHE_MAX_REVERSE);
-
-const quota = {
-  dailyCount: 0,
-  minuteCount: 0,
-  dailyWindowStartMs: Date.now(),
-  minuteBucket: Math.floor(Date.now() / 60_000)
-};
-
-const ipCounters = new Map();
-
-const metrics = {
-  requestsTotal: 0,
-  requestsToOrs: 0,
-  cacheHits: 0,
-  cacheMisses: 0,
-  errors429: 0,
-  blockedByQuota: 0,
-  blockedByIp: 0,
-  degradedCacheServed: 0,
-  degradedRejected: 0
-};
-
-let requestSequence = 0;
-let lastLoggedQuotaStage = 'INIT';
+function buildState(config) {
+  return {
+    config,
+    directionsCache: new TtlCache(config.cacheTtlMs, config.cacheMaxDirections),
+    geocodeCache: new TtlCache(config.cacheTtlMs, config.cacheMaxGeocode),
+    reverseGeocodeCache: new TtlCache(config.cacheTtlMs, config.cacheMaxReverse),
+    quota: {
+      dailyCount: 0,
+      minuteCount: 0,
+      dailyWindowStartMs: Date.now(),
+      minuteBucket: Math.floor(Date.now() / 60_000)
+    },
+    ipCounters: new Map(),
+    metrics: {
+      requestsTotal: 0,
+      requestsToOrs: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      errors429: 0,
+      blockedByQuota: 0,
+      blockedByIp: 0,
+      degradedCacheServed: 0,
+      degradedRejected: 0
+    },
+    requestSequence: 0,
+    lastLoggedQuotaStage: 'INIT',
+    startedAtMs: Date.now()
+  };
+}
 
 function logEvent(event, fields = {}) {
-  const payload = {
+  console.log(JSON.stringify({
     ts: new Date().toISOString(),
     event,
     ...fields
-  };
-  console.log(JSON.stringify(payload));
+  }));
 }
 
-function metricSnapshot() {
-  return {
-    requestsTotal: metrics.requestsTotal,
-    requestsToOrs: metrics.requestsToOrs,
-    cacheHits: metrics.cacheHits,
-    cacheMisses: metrics.cacheMisses,
-    errors429: metrics.errors429,
-    blockedByQuota: metrics.blockedByQuota,
-    blockedByIp: metrics.blockedByIp,
-    degradedCacheServed: metrics.degradedCacheServed,
-    degradedRejected: metrics.degradedRejected
-  };
+function metricSnapshot(state) {
+  return { ...state.metrics };
 }
 
 function clamp(value, min, max) {
@@ -177,13 +174,15 @@ function currentMinuteBucket(nowMs = Date.now()) {
   return Math.floor(nowMs / 60_000);
 }
 
-function refreshQuotaWindows(nowMs = Date.now()) {
+function refreshQuotaWindows(state, nowMs = Date.now()) {
+  const { quota, config } = state;
+
   if (nowMs - quota.dailyWindowStartMs >= 24 * 60 * 60 * 1000) {
     quota.dailyCount = 0;
     quota.dailyWindowStartMs = nowMs;
     logEvent('quota.daily_reset', {
-      dailyLimit: QUOTA_DAILY_SAFE,
-      perMinuteSafe: QUOTA_PER_MINUTE_SAFE
+      dailyLimit: config.quotaDailySafe,
+      perMinuteSafe: config.quotaPerMinuteSafe
     });
   }
 
@@ -194,17 +193,17 @@ function refreshQuotaWindows(nowMs = Date.now()) {
   }
 }
 
-function minutesUntilDailyReset(nowMs = Date.now()) {
-  const endMs = quota.dailyWindowStartMs + 24 * 60 * 60 * 1000;
+function minutesUntilDailyReset(state, nowMs = Date.now()) {
+  const endMs = state.quota.dailyWindowStartMs + 24 * 60 * 60 * 1000;
   const remainingMs = Math.max(1, endMs - nowMs);
   return Math.max(1, Math.ceil(remainingMs / 60_000));
 }
 
-function quotaStageFromRatio(ratio) {
-  if (ratio >= THRESHOLD_BLOCK) return 'BLOCK';
-  if (ratio >= THRESHOLD_DEGRADED) return 'DEGRADED';
-  if (ratio >= THRESHOLD_HARDEN) return 'HARDEN';
-  if (ratio >= THRESHOLD_HIGH_USAGE) return 'HIGH_USAGE';
+function quotaStageFromRatio(config, ratio) {
+  if (ratio >= config.thresholdBlock) return 'BLOCK';
+  if (ratio >= config.thresholdDegraded) return 'DEGRADED';
+  if (ratio >= config.thresholdHarden) return 'HARDEN';
+  if (ratio >= config.thresholdHighUsage) return 'HIGH_USAGE';
   return 'NORMAL';
 }
 
@@ -215,31 +214,28 @@ function usageHeaderFromStage(stage) {
   return 'NORMAL';
 }
 
-function buildQuotaSnapshot(nowMs = Date.now()) {
-  refreshQuotaWindows(nowMs);
+function buildQuotaSnapshot(state, nowMs = Date.now()) {
+  const { quota, config } = state;
+  refreshQuotaWindows(state, nowMs);
 
   const dailyUsed = quota.dailyCount;
-  const dailyLimit = Math.max(1, QUOTA_DAILY_SAFE);
+  const dailyLimit = Math.max(1, config.quotaDailySafe);
   const dailyRatio = dailyUsed / dailyLimit;
-  const stage = quotaStageFromRatio(dailyRatio);
-
+  const stage = quotaStageFromRatio(config, dailyRatio);
   const remainingDaily = Math.max(0, dailyLimit - dailyUsed);
-  const remainingMinutes = minutesUntilDailyReset(nowMs);
+  const remainingMinutes = minutesUntilDailyReset(state, nowMs);
 
-  // Dynamic minute target (formula from operational plan):
-  // T_m = min(M, max(1, floor((R_d / R_m) * k)))
   const baseMinuteLimit = Math.min(
-    QUOTA_PER_MINUTE_SAFE,
-    Math.max(1, Math.floor((remainingDaily / remainingMinutes) * DYNAMIC_MINUTE_FACTOR_K))
+    config.quotaPerMinuteSafe,
+    Math.max(1, Math.floor((remainingDaily / remainingMinutes) * config.dynamicMinuteFactorK))
   );
 
   let minuteLimitDynamic = baseMinuteLimit;
   if (stage === 'NORMAL' || stage === 'HIGH_USAGE') {
-    // Evita bloquear casi todo el trafico al inicio del dia por la formula de pacing.
-    minuteLimitDynamic = Math.max(baseMinuteLimit, DYNAMIC_MINUTE_MIN_LIMIT);
+    minuteLimitDynamic = Math.max(baseMinuteLimit, config.dynamicMinuteMinLimit);
   }
   if (stage === 'HARDEN') {
-    minuteLimitDynamic = Math.max(1, Math.floor(baseMinuteLimit * HARDEN_MINUTE_FACTOR));
+    minuteLimitDynamic = Math.max(1, Math.floor(baseMinuteLimit * config.hardenMinuteFactor));
   }
   if (stage === 'DEGRADED') {
     minuteLimitDynamic = 1;
@@ -255,15 +251,15 @@ function buildQuotaSnapshot(nowMs = Date.now()) {
     remainingDaily,
     remainingMinutes,
     minuteUsed: quota.minuteCount,
-    minuteLimitSafe: QUOTA_PER_MINUTE_SAFE,
+    minuteLimitSafe: config.quotaPerMinuteSafe,
     minuteLimitBase: baseMinuteLimit,
     minuteLimitDynamic,
     stage,
     headerState: usageHeaderFromStage(stage)
   };
 
-  if (snapshot.stage !== lastLoggedQuotaStage) {
-    lastLoggedQuotaStage = snapshot.stage;
+  if (snapshot.stage !== state.lastLoggedQuotaStage) {
+    state.lastLoggedQuotaStage = snapshot.stage;
     logEvent('quota.state_changed', {
       stage: snapshot.stage,
       usageState: snapshot.headerState,
@@ -290,8 +286,52 @@ function buildUsageHeaders(snapshot, extraHeaders = {}) {
   };
 }
 
-function consumeDirectionsBudget(snapshot) {
-  refreshQuotaWindows();
+function buildBaseHeaders(state, requestId, extraHeaders = {}) {
+  return {
+    'Access-Control-Allow-Origin': state.config.corsAllowOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+    'Referrer-Policy': 'no-referrer',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-Request-Id': String(requestId),
+    ...extraHeaders
+  };
+}
+
+function jsonResponse(res, state, requestId, statusCode, payload, extraHeaders = {}) {
+  const body = JSON.stringify(payload);
+  res.writeHead(statusCode, buildBaseHeaders(state, requestId, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': Buffer.byteLength(body),
+    ...extraHeaders
+  }));
+  res.end(body);
+}
+
+function respond(res, state, ctx, statusCode, payload, headers = {}, logFields = {}) {
+  jsonResponse(res, state, ctx.requestId, statusCode, payload, headers);
+  logEvent('request.completed', {
+    requestId: ctx.requestId,
+    path: ctx.path,
+    statusCode,
+    durationMs: Date.now() - ctx.startMs,
+    ...logFields,
+    metrics: metricSnapshot(state)
+  });
+}
+
+function errorResponse(res, state, ctx, statusCode, error, message, headers = {}, logFields = {}) {
+  respond(res, state, ctx, statusCode, { error, message }, headers, {
+    error,
+    ...logFields
+  });
+}
+
+function consumeDirectionsBudget(state, snapshot) {
+  refreshQuotaWindows(state);
 
   if (snapshot.stage === 'BLOCK') {
     return { ok: false, reason: 'BLOCK' };
@@ -299,15 +339,15 @@ function consumeDirectionsBudget(snapshot) {
   if (snapshot.stage === 'DEGRADED') {
     return { ok: false, reason: 'DEGRADED' };
   }
-  if (quota.dailyCount >= QUOTA_DAILY_SAFE) {
+  if (state.quota.dailyCount >= state.config.quotaDailySafe) {
     return { ok: false, reason: 'BLOCK' };
   }
-  if (quota.minuteCount >= snapshot.minuteLimitDynamic) {
+  if (state.quota.minuteCount >= snapshot.minuteLimitDynamic) {
     return { ok: false, reason: 'MINUTE_DYNAMIC' };
   }
 
-  quota.dailyCount += 1;
-  quota.minuteCount += 1;
+  state.quota.dailyCount += 1;
+  state.quota.minuteCount += 1;
   return { ok: true };
 }
 
@@ -326,72 +366,42 @@ function extractClientIp(req) {
   return normalizeIp(req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : 'unknown');
 }
 
-function cleanupIpCounters(nowMs) {
+function cleanupIpCounters(state, nowMs) {
   const cutoffMs = nowMs - 10 * 60_000;
-  for (const [ip, entry] of ipCounters.entries()) {
+  for (const [ip, entry] of state.ipCounters.entries()) {
     if (entry.lastSeen < cutoffMs) {
-      ipCounters.delete(ip);
+      state.ipCounters.delete(ip);
     }
   }
 }
 
-function checkIpRateLimit(req, nowMs = Date.now()) {
+function checkIpRateLimit(state, req, nowMs = Date.now()) {
   const ip = extractClientIp(req);
   const bucket = currentMinuteBucket(nowMs);
 
-  let entry = ipCounters.get(ip);
+  let entry = state.ipCounters.get(ip);
   if (!entry || entry.bucket !== bucket) {
     entry = { bucket, count: 0, lastSeen: nowMs };
   }
 
   entry.count += 1;
   entry.lastSeen = nowMs;
-  ipCounters.set(ip, entry);
+  state.ipCounters.set(ip, entry);
 
-  if (ipCounters.size > 1000 && bucket % 5 === 0) {
-    cleanupIpCounters(nowMs);
+  if (state.ipCounters.size > 1000 && bucket % 5 === 0) {
+    cleanupIpCounters(state, nowMs);
   }
 
-  return entry.count <= IP_RATE_LIMIT_PER_MINUTE;
+  return entry.count <= state.config.ipRateLimitPerMinute;
 }
 
-function jsonResponse(res, statusCode, payload, extraHeaders = {}) {
-  const body = JSON.stringify(payload);
-  res.writeHead(statusCode, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Content-Length': Buffer.byteLength(body),
-    'Access-Control-Allow-Origin': '*',
-    ...extraHeaders
-  });
-  res.end(body);
-}
-
-function respond(res, ctx, statusCode, payload, headers = {}, logFields = {}) {
-  jsonResponse(res, statusCode, payload, headers);
-  logEvent('request.completed', {
-    requestId: ctx.requestId,
-    path: ctx.path,
-    statusCode,
-    durationMs: Date.now() - ctx.startMs,
-    ...logFields,
-    metrics: metricSnapshot()
-  });
-}
-
-function errorResponse(res, ctx, statusCode, error, message, headers = {}, logFields = {}) {
-  respond(res, ctx, statusCode, { error, message }, headers, {
-    error,
-    ...logFields
-  });
-}
-
-async function readJsonBody(req) {
+function readJsonBody(req, state) {
   return new Promise((resolve, reject) => {
     let raw = '';
 
     req.on('data', (chunk) => {
       raw += chunk;
-      if (raw.length > MAX_BODY_BYTES) {
+      if (raw.length > state.config.maxBodyBytes) {
         reject(new Error('Payload too large'));
         req.destroy();
       }
@@ -413,10 +423,10 @@ async function readJsonBody(req) {
   });
 }
 
-async function fetchJson(url, options) {
+async function fetchJson(state, url, options) {
   const response = await fetch(url, {
     ...options,
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    signal: AbortSignal.timeout(state.config.requestTimeoutMs)
   });
 
   let payload = null;
@@ -462,7 +472,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return 6371 * c;
 }
 
-function validateDirectionsPayload(body) {
+function validateDirectionsPayload(state, body) {
   if (!body || typeof body !== 'object') {
     return { ok: false, message: 'Payload de directions invalido.' };
   }
@@ -471,7 +481,7 @@ function validateDirectionsPayload(body) {
   if (!Array.isArray(coordinates) || coordinates.length < 2) {
     return { ok: false, message: 'Se requieren al menos 2 coordenadas.' };
   }
-  if (coordinates.length > MAX_COORDINATE_PAIRS) {
+  if (coordinates.length > state.config.maxCoordinatePairs) {
     return { ok: false, message: 'Demasiados puntos en la ruta solicitada.' };
   }
 
@@ -495,7 +505,7 @@ function validateDirectionsPayload(body) {
   const first = normalized[0];
   const last = normalized[normalized.length - 1];
   const approxDistanceKm = haversineKm(first[1], first[0], last[1], last[0]);
-  if (approxDistanceKm > MAX_ROUTE_DISTANCE_KM) {
+  if (approxDistanceKm > state.config.maxRouteDistanceKm) {
     return { ok: false, message: 'Ruta fuera del rango permitido.' };
   }
 
@@ -528,12 +538,13 @@ function quotaLogFields(snapshot) {
   };
 }
 
-async function handleDirections(req, res, ctx, body) {
-  const validation = validateDirectionsPayload(body);
+async function handleDirections(state, req, res, ctx, body) {
+  const validation = validateDirectionsPayload(state, body);
   if (!validation.ok) {
-    const snapshot = buildQuotaSnapshot();
+    const snapshot = buildQuotaSnapshot(state);
     errorResponse(
       res,
+      state,
       ctx,
       400,
       'BAD_REQUEST',
@@ -545,13 +556,14 @@ async function handleDirections(req, res, ctx, body) {
   }
 
   const key = directionsCacheKey(validation.normalizedCoordinates);
-  const snapshot = buildQuotaSnapshot();
+  const snapshot = buildQuotaSnapshot(state);
 
   if (snapshot.stage === 'BLOCK') {
-    metrics.errors429 += 1;
-    metrics.blockedByQuota += 1;
+    state.metrics.errors429 += 1;
+    state.metrics.blockedByQuota += 1;
     errorResponse(
       res,
+      state,
       ctx,
       429,
       QUOTA_ERROR_PAYLOAD.error,
@@ -562,14 +574,15 @@ async function handleDirections(req, res, ctx, body) {
     return;
   }
 
-  const cached = directionsCache.get(key);
+  const cached = state.directionsCache.get(key);
   if (cached) {
-    metrics.cacheHits += 1;
+    state.metrics.cacheHits += 1;
     if (snapshot.stage === 'DEGRADED') {
-      metrics.degradedCacheServed += 1;
+      state.metrics.degradedCacheServed += 1;
     }
     respond(
       res,
+      state,
       ctx,
       200,
       cached,
@@ -582,12 +595,13 @@ async function handleDirections(req, res, ctx, body) {
     return;
   }
 
-  metrics.cacheMisses += 1;
+  state.metrics.cacheMisses += 1;
 
   if (snapshot.stage === 'DEGRADED') {
-    metrics.degradedRejected += 1;
+    state.metrics.degradedRejected += 1;
     errorResponse(
       res,
+      state,
       ctx,
       503,
       DEGRADED_ERROR_PAYLOAD.error,
@@ -598,13 +612,14 @@ async function handleDirections(req, res, ctx, body) {
     return;
   }
 
-  const consume = consumeDirectionsBudget(snapshot);
+  const consume = consumeDirectionsBudget(state, snapshot);
   if (!consume.ok) {
-    const afterDenied = buildQuotaSnapshot();
+    const afterDenied = buildQuotaSnapshot(state);
     if (consume.reason === 'MINUTE_DYNAMIC') {
-      metrics.errors429 += 1;
+      state.metrics.errors429 += 1;
       errorResponse(
         res,
+        state,
         ctx,
         429,
         'RATE_LIMITED',
@@ -615,10 +630,11 @@ async function handleDirections(req, res, ctx, body) {
       return;
     }
 
-    metrics.errors429 += 1;
-    metrics.blockedByQuota += 1;
+    state.metrics.errors429 += 1;
+    state.metrics.blockedByQuota += 1;
     errorResponse(
       res,
+      state,
       ctx,
       429,
       QUOTA_ERROR_PAYLOAD.error,
@@ -629,11 +645,12 @@ async function handleDirections(req, res, ctx, body) {
     return;
   }
 
-  const afterConsume = buildQuotaSnapshot();
+  const afterConsume = buildQuotaSnapshot(state);
   if (afterConsume.stage === 'DEGRADED') {
-    metrics.degradedRejected += 1;
+    state.metrics.degradedRejected += 1;
     errorResponse(
       res,
+      state,
       ctx,
       503,
       DEGRADED_ERROR_PAYLOAD.error,
@@ -645,22 +662,27 @@ async function handleDirections(req, res, ctx, body) {
   }
 
   try {
-    metrics.requestsToOrs += 1;
-    const { response, payload } = await fetchJson(`${ORS_BASE_URL}/v2/directions/driving-car`, {
-      method: 'POST',
-      headers: {
-        Authorization: ORS_API_KEY,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({ coordinates: validation.normalizedCoordinates })
-    });
+    state.metrics.requestsToOrs += 1;
+    const { response, payload } = await fetchJson(
+      state,
+      `${state.config.orsBaseUrl}/v2/directions/driving-car`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: state.config.orsApiKey,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({ coordinates: validation.normalizedCoordinates })
+      }
+    );
 
-    const finalSnapshot = buildQuotaSnapshot();
+    const finalSnapshot = buildQuotaSnapshot(state);
     if (response.status === 429) {
-      metrics.errors429 += 1;
+      state.metrics.errors429 += 1;
       errorResponse(
         res,
+        state,
         ctx,
         429,
         QUOTA_ERROR_PAYLOAD.error,
@@ -674,6 +696,7 @@ async function handleDirections(req, res, ctx, body) {
     if (!response.ok || !payload) {
       errorResponse(
         res,
+        state,
         ctx,
         response.status || 502,
         'UPSTREAM_ERROR',
@@ -684,9 +707,10 @@ async function handleDirections(req, res, ctx, body) {
       return;
     }
 
-    directionsCache.set(key, payload);
+    state.directionsCache.set(key, payload);
     respond(
       res,
+      state,
       ctx,
       200,
       payload,
@@ -694,9 +718,10 @@ async function handleDirections(req, res, ctx, body) {
       { cache: 'MISS', ...quotaLogFields(finalSnapshot) }
     );
   } catch (_err) {
-    const finalSnapshot = buildQuotaSnapshot();
+    const finalSnapshot = buildQuotaSnapshot(state);
     errorResponse(
       res,
+      state,
       ctx,
       503,
       'TEMP_UNAVAILABLE',
@@ -707,14 +732,14 @@ async function handleDirections(req, res, ctx, body) {
   }
 }
 
-async function handleGeocode(req, res, ctx, body) {
+async function handleGeocode(state, res, ctx, body) {
   const text = normalizeSearchText(body && body.text);
   if (text.length < 2) {
-    errorResponse(res, ctx, 400, 'BAD_REQUEST', 'text es obligatorio.');
+    errorResponse(res, state, ctx, 400, 'BAD_REQUEST', 'text es obligatorio.');
     return;
   }
-  if (text.length > MAX_GEOCODE_TEXT_LENGTH) {
-    errorResponse(res, ctx, 400, 'BAD_REQUEST', 'text excede el largo maximo permitido.');
+  if (text.length > state.config.maxGeocodeTextLength) {
+    errorResponse(res, state, ctx, 400, 'BAD_REQUEST', 'text excede el largo maximo permitido.');
     return;
   }
 
@@ -722,42 +747,49 @@ async function handleGeocode(req, res, ctx, body) {
   const size = Number.isFinite(sizeRaw) ? clamp(sizeRaw, 1, 10) : 5;
   const key = `${text}|${size}`;
 
-  const cached = geocodeCache.get(key);
+  const cached = state.geocodeCache.get(key);
   if (cached) {
-    metrics.cacheHits += 1;
-    respond(res, ctx, 200, cached, { 'X-Cache': 'HIT' }, { cache: 'HIT' });
+    state.metrics.cacheHits += 1;
+    respond(res, state, ctx, 200, cached, { 'X-Cache': 'HIT' }, { cache: 'HIT' });
     return;
   }
 
-  metrics.cacheMisses += 1;
+  state.metrics.cacheMisses += 1;
 
-  const url = new URL('/geocode/search', ORS_BASE_URL);
+  const url = new URL('/geocode/search', state.config.orsBaseUrl);
   url.searchParams.set('text', text);
   url.searchParams.set('size', String(size));
-  url.searchParams.set('api_key', ORS_API_KEY);
+  url.searchParams.set('api_key', state.config.orsApiKey);
 
   try {
-    metrics.requestsToOrs += 1;
-    const { response, payload } = await fetchJson(url.toString(), { method: 'GET' });
+    state.metrics.requestsToOrs += 1;
+    const { response, payload } = await fetchJson(state, url.toString(), { method: 'GET' });
     if (!response.ok || !payload) {
-      errorResponse(res, ctx, response.status || 502, 'UPSTREAM_ERROR', 'Error al consultar geocode.', {}, {
-        upstreamStatus: response.status
-      });
+      errorResponse(
+        res,
+        state,
+        ctx,
+        response.status || 502,
+        'UPSTREAM_ERROR',
+        'Error al consultar geocode.',
+        {},
+        { upstreamStatus: response.status }
+      );
       return;
     }
 
-    geocodeCache.set(key, payload);
-    respond(res, ctx, 200, payload, { 'X-Cache': 'MISS' }, { cache: 'MISS' });
+    state.geocodeCache.set(key, payload);
+    respond(res, state, ctx, 200, payload, { 'X-Cache': 'MISS' }, { cache: 'MISS' });
   } catch (_err) {
-    errorResponse(res, ctx, 503, 'TEMP_UNAVAILABLE', 'Servicio temporalmente no disponible.');
+    errorResponse(res, state, ctx, 503, 'TEMP_UNAVAILABLE', 'Servicio temporalmente no disponible.');
   }
 }
 
-async function handleReverseGeocode(req, res, ctx, body) {
+async function handleReverseGeocode(state, res, ctx, body) {
   const lat = Number(body && body.lat);
   const lon = Number(body && body.lon);
   if (!isValidLatitude(lat) || !isValidLongitude(lon)) {
-    errorResponse(res, ctx, 400, 'BAD_REQUEST', 'lat y lon son obligatorios.');
+    errorResponse(res, state, ctx, 400, 'BAD_REQUEST', 'lat y lon son obligatorios.');
     return;
   }
 
@@ -765,123 +797,225 @@ async function handleReverseGeocode(req, res, ctx, body) {
   const size = Number.isFinite(sizeRaw) ? clamp(sizeRaw, 1, 5) : 1;
   const key = `${lat.toFixed(5)},${lon.toFixed(5)}|${size}`;
 
-  const cached = reverseGeocodeCache.get(key);
+  const cached = state.reverseGeocodeCache.get(key);
   if (cached) {
-    metrics.cacheHits += 1;
-    respond(res, ctx, 200, cached, { 'X-Cache': 'HIT' }, { cache: 'HIT' });
+    state.metrics.cacheHits += 1;
+    respond(res, state, ctx, 200, cached, { 'X-Cache': 'HIT' }, { cache: 'HIT' });
     return;
   }
 
-  metrics.cacheMisses += 1;
+  state.metrics.cacheMisses += 1;
 
-  const url = new URL('/geocode/reverse', ORS_BASE_URL);
+  const url = new URL('/geocode/reverse', state.config.orsBaseUrl);
   url.searchParams.set('point.lat', String(lat));
   url.searchParams.set('point.lon', String(lon));
   url.searchParams.set('size', String(size));
-  url.searchParams.set('api_key', ORS_API_KEY);
+  url.searchParams.set('api_key', state.config.orsApiKey);
 
   try {
-    metrics.requestsToOrs += 1;
-    const { response, payload } = await fetchJson(url.toString(), { method: 'GET' });
+    state.metrics.requestsToOrs += 1;
+    const { response, payload } = await fetchJson(state, url.toString(), { method: 'GET' });
     if (!response.ok || !payload) {
-      errorResponse(res, ctx, response.status || 502, 'UPSTREAM_ERROR', 'Error al consultar reverse geocode.', {}, {
-        upstreamStatus: response.status
-      });
+      errorResponse(
+        res,
+        state,
+        ctx,
+        response.status || 502,
+        'UPSTREAM_ERROR',
+        'Error al consultar reverse geocode.',
+        {},
+        { upstreamStatus: response.status }
+      );
       return;
     }
 
-    reverseGeocodeCache.set(key, payload);
-    respond(res, ctx, 200, payload, { 'X-Cache': 'MISS' }, { cache: 'MISS' });
+    state.reverseGeocodeCache.set(key, payload);
+    respond(res, state, ctx, 200, payload, { 'X-Cache': 'MISS' }, { cache: 'MISS' });
   } catch (_err) {
-    errorResponse(res, ctx, 503, 'TEMP_UNAVAILABLE', 'Servicio temporalmente no disponible.');
+    errorResponse(res, state, ctx, 503, 'TEMP_UNAVAILABLE', 'Servicio temporalmente no disponible.');
   }
 }
 
-const server = http.createServer(async (req, res) => {
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    });
-    res.end();
-    return;
-  }
-
-  if (!ORS_API_KEY) {
-    jsonResponse(res, 500, {
-      error: 'CONFIG_ERROR',
-      message: 'ORS_API_KEY no esta configurada en el backend.'
-    });
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    jsonResponse(res, 404, { error: 'NOT_FOUND', message: 'Endpoint no disponible.' });
-    return;
-  }
-
-  metrics.requestsTotal += 1;
-  const ctx = {
-    requestId: ++requestSequence,
-    path: new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`).pathname,
-    startMs: Date.now()
+function buildHealthPayload(state) {
+  return {
+    status: state.config.orsApiKey ? 'ok' : 'degraded',
+    service: 'asombrate-ors-gateway',
+    uptimeSeconds: Math.floor((Date.now() - state.startedAtMs) / 1000),
+    orsConfigured: Boolean(state.config.orsApiKey),
+    quota: buildQuotaSnapshot(state),
+    caches: {
+      directionsEntries: state.directionsCache.size(),
+      geocodeEntries: state.geocodeCache.size(),
+      reverseGeocodeEntries: state.reverseGeocodeCache.size()
+    },
+    metrics: metricSnapshot(state)
   };
+}
 
-  if (!checkIpRateLimit(req, ctx.startMs)) {
-    metrics.errors429 += 1;
-    metrics.blockedByIp += 1;
+function handleHealth(state, res, ctx) {
+  respond(res, state, ctx, 200, buildHealthPayload(state));
+}
+
+function handleReady(state, res, ctx) {
+  if (!state.config.orsApiKey) {
     errorResponse(
       res,
+      state,
       ctx,
-      429,
-      'TOO_MANY_REQUESTS',
-      'Demasiadas solicitudes. Intenta nuevamente en unos segundos.',
-      { 'X-Usage-State': 'NORMAL' },
-      { reason: 'IP_RATE_LIMITED' }
+      503,
+      'CONFIG_ERROR',
+      'ORS_API_KEY no esta configurada en el backend.'
     );
     return;
   }
-
-  let body;
-  try {
-    body = await readJsonBody(req);
-  } catch (err) {
-    const message = err.message === 'Payload too large'
-      ? 'Payload demasiado grande.'
-      : 'JSON invalido.';
-    errorResponse(res, ctx, 400, 'BAD_REQUEST', message);
-    return;
-  }
-
-  if (ctx.path === '/directions') {
-    await handleDirections(req, res, ctx, body);
-    return;
-  }
-
-  if (ctx.path === '/geocode') {
-    await handleGeocode(req, res, ctx, body);
-    return;
-  }
-
-  if (ctx.path === '/reverse-geocode') {
-    await handleReverseGeocode(req, res, ctx, body);
-    return;
-  }
-
-  errorResponse(res, ctx, 404, 'NOT_FOUND', 'Endpoint no disponible.');
-});
-
-server.listen(PORT, () => {
-  logEvent('server.started', {
-    port: PORT,
-    orsBaseUrl: ORS_BASE_URL,
-    dailySafe: QUOTA_DAILY_SAFE,
-    minuteSafe: QUOTA_PER_MINUTE_SAFE,
-    dynamicFactorK: DYNAMIC_MINUTE_FACTOR_K,
-    dynamicMinuteMinLimit: DYNAMIC_MINUTE_MIN_LIMIT,
-    cacheTtlMs: CACHE_TTL_MS,
-    maxBodyBytes: MAX_BODY_BYTES,
-    ipRateLimitPerMinute: IP_RATE_LIMIT_PER_MINUTE
+  respond(res, state, ctx, 200, {
+    status: 'ready',
+    service: 'asombrate-ors-gateway'
   });
-});
+}
+
+function createServer(options = {}) {
+  const config = options.config || buildRuntimeConfig(options.env);
+  const state = options.state || buildState(config);
+
+  const server = http.createServer(async (req, res) => {
+    const ctx = {
+      requestId: ++state.requestSequence,
+      path: new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`).pathname,
+      startMs: Date.now()
+    };
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, buildBaseHeaders(state, ctx.requestId));
+      res.end();
+      return;
+    }
+
+    if (ctx.path === '/healthz' && req.method === 'GET') {
+      handleHealth(state, res, ctx);
+      return;
+    }
+
+    if (ctx.path === '/readyz' && req.method === 'GET') {
+      handleReady(state, res, ctx);
+      return;
+    }
+
+    if (!state.config.orsApiKey) {
+      errorResponse(
+        res,
+        state,
+        ctx,
+        503,
+        'CONFIG_ERROR',
+        'ORS_API_KEY no esta configurada en el backend.'
+      );
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      errorResponse(res, state, ctx, 404, 'NOT_FOUND', 'Endpoint no disponible.');
+      return;
+    }
+
+    const contentType = String(req.headers['content-type'] || '');
+    if (!contentType.toLowerCase().startsWith('application/json')) {
+      errorResponse(
+        res,
+        state,
+        ctx,
+        415,
+        'UNSUPPORTED_MEDIA_TYPE',
+        'Content-Type debe ser application/json.'
+      );
+      return;
+    }
+
+    state.metrics.requestsTotal += 1;
+
+    if (!checkIpRateLimit(state, req, ctx.startMs)) {
+      state.metrics.errors429 += 1;
+      state.metrics.blockedByIp += 1;
+      errorResponse(
+        res,
+        state,
+        ctx,
+        429,
+        'TOO_MANY_REQUESTS',
+        'Demasiadas solicitudes. Intenta nuevamente en unos segundos.',
+        { 'X-Usage-State': 'NORMAL' },
+        { reason: 'IP_RATE_LIMITED' }
+      );
+      return;
+    }
+
+    let body;
+    try {
+      body = await readJsonBody(req, state);
+    } catch (err) {
+      const message = err.message === 'Payload too large'
+        ? 'Payload demasiado grande.'
+        : 'JSON invalido.';
+      errorResponse(res, state, ctx, 400, 'BAD_REQUEST', message);
+      return;
+    }
+
+    if (ctx.path === '/directions') {
+      await handleDirections(state, req, res, ctx, body);
+      return;
+    }
+
+    if (ctx.path === '/geocode') {
+      await handleGeocode(state, res, ctx, body);
+      return;
+    }
+
+    if (ctx.path === '/reverse-geocode') {
+      await handleReverseGeocode(state, res, ctx, body);
+      return;
+    }
+
+    errorResponse(res, state, ctx, 404, 'NOT_FOUND', 'Endpoint no disponible.');
+  });
+
+  server.asombrateState = state;
+  return server;
+}
+
+function startServer(options = {}) {
+  const config = options.config || buildRuntimeConfig(options.env);
+  const server = createServer({ config, state: buildState(config) });
+  server.listen(config.port, () => {
+    logEvent('server.started', {
+      port: config.port,
+      orsBaseUrl: config.orsBaseUrl,
+      dailySafe: config.quotaDailySafe,
+      minuteSafe: config.quotaPerMinuteSafe,
+      dynamicFactorK: config.dynamicMinuteFactorK,
+      dynamicMinuteMinLimit: config.dynamicMinuteMinLimit,
+      cacheTtlMs: config.cacheTtlMs,
+      maxBodyBytes: config.maxBodyBytes,
+      ipRateLimitPerMinute: config.ipRateLimitPerMinute
+    });
+  });
+  return server;
+}
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  QUOTA_ERROR_PAYLOAD,
+  DEGRADED_ERROR_PAYLOAD,
+  TtlCache,
+  buildRuntimeConfig,
+  buildState,
+  buildQuotaSnapshot,
+  createServer,
+  directionsCacheKey,
+  normalizeCoordinatePair,
+  normalizeSearchText,
+  startServer,
+  validateDirectionsPayload
+};

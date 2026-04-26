@@ -12,6 +12,7 @@ retrofit = "2.9.0"
 gson = "2.10.1"
 suncalc = "3.9"
 osmdroid = "6.1.18"
+spotbugsAnnotations = "4.9.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -32,6 +33,7 @@ retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = 
 retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 suncalc = { group = "org.shredzone.suncalc", name = "suncalc", version.ref = "suncalc" }
 osmdroid = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
+spotbugs-annotations = { group = "com.github.spotbugs", name = "spotbugs-annotations", version.ref = "spotbugsAnnotations" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

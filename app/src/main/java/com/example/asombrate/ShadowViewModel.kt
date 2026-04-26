@@ -138,7 +138,13 @@ class ShadowViewModel(
     @SuppressLint("MissingPermission")
     fun useCurrentLocation(isOrigin: Boolean) {
         val stateFlow = if (isOrigin) _originState else _destinationState
-        stateFlow.update { it.copy(isReverseGeocoding = true) }
+        stateFlow.update {
+            it.copy(
+                isReverseGeocoding = true,
+                statusMessage = null,
+                statusMessageIsError = false
+            )
+        }
         
         fusedLocationClient.getCurrentLocation(
             Priority.PRIORITY_HIGH_ACCURACY,
@@ -161,21 +167,45 @@ class ShadowViewModel(
                 }
             } else {
                 stateFlow.update { it.copy(isReverseGeocoding = false) }
+                setFieldStatus(
+                    stateFlow,
+                    UiText(R.string.error_location_unavailable),
+                    isError = true
+                )
             }
         }.addOnFailureListener {
             stateFlow.update { it.copy(isReverseGeocoding = false) }
+            setFieldStatus(
+                stateFlow,
+                UiText(R.string.error_location_unavailable),
+                isError = true
+            )
         }
     }
 
     // --- Búsqueda por texto ---
 
     fun onOriginQueryChanged(text: String) {
-        _originState.update { it.copy(query = text, confirmed = null) }
+        _originState.update {
+            it.copy(
+                query = text,
+                confirmed = null,
+                statusMessage = null,
+                statusMessageIsError = false
+            )
+        }
         _originQuery.value = text
     }
 
     fun onDestinationQueryChanged(text: String) {
-        _destinationState.update { it.copy(query = text, confirmed = null) }
+        _destinationState.update {
+            it.copy(
+                query = text,
+                confirmed = null,
+                statusMessage = null,
+                statusMessageIsError = false
+            )
+        }
         _destinationQuery.value = text
     }
 
@@ -189,7 +219,9 @@ class ShadowViewModel(
                 suggestions = emptyList(),
                 mapLat = suggestion.lat,
                 mapLng = suggestion.lng,
-                flyToVersion = it.flyToVersion + 1
+                flyToVersion = it.flyToVersion + 1,
+                statusMessage = null,
+                statusMessageIsError = false
             )
         }
         lastOriginReverseAt = LatLng(suggestion.lat, suggestion.lng)
@@ -203,7 +235,9 @@ class ShadowViewModel(
                 suggestions = emptyList(),
                 mapLat = suggestion.lat,
                 mapLng = suggestion.lng,
-                flyToVersion = it.flyToVersion + 1
+                flyToVersion = it.flyToVersion + 1,
+                statusMessage = null,
+                statusMessageIsError = false
             )
         }
         lastDestinationReverseAt = LatLng(suggestion.lat, suggestion.lng)
@@ -213,14 +247,28 @@ class ShadowViewModel(
 
     fun onOriginMapMoved(lat: Double, lng: Double) {
         _originState.update {
-            it.copy(mapLat = lat, mapLng = lng, confirmed = null, isReverseGeocoding = true)
+            it.copy(
+                mapLat = lat,
+                mapLng = lng,
+                confirmed = null,
+                isReverseGeocoding = true,
+                statusMessage = null,
+                statusMessageIsError = false
+            )
         }
         _originMapCenter.tryEmit(LatLng(lat, lng))
     }
 
     fun onDestinationMapMoved(lat: Double, lng: Double) {
         _destinationState.update {
-            it.copy(mapLat = lat, mapLng = lng, confirmed = null, isReverseGeocoding = true)
+            it.copy(
+                mapLat = lat,
+                mapLng = lng,
+                confirmed = null,
+                isReverseGeocoding = true,
+                statusMessage = null,
+                statusMessageIsError = false
+            )
         }
         _destinationMapCenter.tryEmit(LatLng(lat, lng))
     }
@@ -235,7 +283,9 @@ class ShadowViewModel(
                     lat = it.mapLat,
                     lng = it.mapLng
                 ),
-                suggestions = emptyList()
+                suggestions = emptyList(),
+                statusMessage = null,
+                statusMessageIsError = false
             )
         }
     }
@@ -248,9 +298,30 @@ class ShadowViewModel(
                     lat = it.mapLat,
                     lng = it.mapLng
                 ),
-                suggestions = emptyList()
+                suggestions = emptyList(),
+                statusMessage = null,
+                statusMessageIsError = false
             )
         }
+    }
+
+    private fun setFieldStatus(
+        state: MutableStateFlow<LocationFieldState>,
+        message: UiText?,
+        isError: Boolean
+    ) {
+        state.update {
+            it.copy(
+                statusMessage = message,
+                statusMessageIsError = isError
+            )
+        }
+    }
+
+    private fun updateServiceModeFromError(error: Throwable) {
+        val usageStateHeader = extractUsageStateHeader(error)
+        val classified = NetworkErrorClassifier.classify(error, usageStateHeader)
+        _serviceMode.value = parseUsageStateHeader(usageStateHeader) ?: classified.serviceMode
     }
 
     // --- Funciones internas ---
@@ -260,13 +331,27 @@ class ShadowViewModel(
         state: MutableStateFlow<LocationFieldState>
     ) {
         if (query.isBlank()) {
-            state.update { it.copy(suggestions = emptyList(), isSearching = false) }
+            state.update {
+                it.copy(
+                    suggestions = emptyList(),
+                    isSearching = false,
+                    statusMessage = null,
+                    statusMessageIsError = false
+                )
+            }
             return
         }
         // Fase 2: cache por query normalizada
         val key = query.trim().lowercase()
         geocodeCache.get(key)?.let { cached ->
-            state.update { it.copy(suggestions = cached, isSearching = false) }
+            state.update {
+                it.copy(
+                    suggestions = cached,
+                    isSearching = false,
+                    statusMessage = null,
+                    statusMessageIsError = false
+                )
+            }
             return
         }
         state.update { it.copy(isSearching = true) }
@@ -284,9 +369,25 @@ class ShadowViewModel(
                 )
             }
             geocodeCache.put(key, suggestions)
-            state.update { it.copy(suggestions = suggestions, isSearching = false) }
-        } catch (_: Exception) {
-            state.update { it.copy(suggestions = emptyList(), isSearching = false) }
+            state.update {
+                it.copy(
+                    suggestions = suggestions,
+                    isSearching = false,
+                    statusMessage = null,
+                    statusMessageIsError = false
+                )
+            }
+        } catch (e: Exception) {
+            updateServiceModeFromError(e)
+            val err = NetworkErrorClassifier.classify(e, extractUsageStateHeader(e))
+            state.update {
+                it.copy(
+                    suggestions = emptyList(),
+                    isSearching = false,
+                    statusMessage = err.userMessage,
+                    statusMessageIsError = true
+                )
+            }
         }
     }
 
@@ -297,7 +398,14 @@ class ShadowViewModel(
         // Fase 2: cache por lat/lng redondeado (bucket ~10m)
         val key = "%.4f,%.4f".format(center.lat, center.lng)
         reverseGeocodeCache.get(key)?.let { cached ->
-            state.update { it.copy(query = cached, isReverseGeocoding = false) }
+            state.update {
+                it.copy(
+                    query = cached,
+                    isReverseGeocoding = false,
+                    statusMessage = null,
+                    statusMessageIsError = false
+                )
+            }
             return
         }
         state.update { it.copy(isReverseGeocoding = true) }
@@ -314,13 +422,21 @@ class ShadowViewModel(
                 ?: "%.5f, %.5f".format(center.lat, center.lng)
             reverseGeocodeCache.put(key, label)
             state.update {
-                it.copy(query = label, isReverseGeocoding = false)
+                it.copy(
+                    query = label,
+                    isReverseGeocoding = false,
+                    statusMessage = null,
+                    statusMessageIsError = false
+                )
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            updateServiceModeFromError(e)
             state.update {
                 it.copy(
                     query = "%.5f, %.5f".format(center.lat, center.lng),
-                    isReverseGeocoding = false
+                    isReverseGeocoding = false,
+                    statusMessage = UiText(R.string.error_reverse_geocode_temporarily_unavailable),
+                    statusMessageIsError = true
                 )
             }
         }

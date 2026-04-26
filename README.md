@@ -121,7 +121,7 @@ Flujo simplificado:
 ## 6. Requisitos para desarrollo
 
 - Android Studio (recomendado estable reciente).
-- JDK 11.
+- JDK 17.
 - SDK Android con API 36.
 
 ## 7. Configuración local y de producción
@@ -133,7 +133,7 @@ La app Android consume un backend gateway propio (no llama ORS directo en produc
 
 ```properties
 BACKEND_BASE_URL_DEBUG=http://10.0.2.2:8081/
-BACKEND_BASE_URL_RELEASE=https://tu-backend-publico.com/
+BACKEND_BASE_URL_RELEASE=https://asombrate-backend.onrender.com/
 ```
 
 3. Para pruebas locales del backend, la key ORS se carga en el gateway desde entorno o `local.properties`:
@@ -146,7 +146,8 @@ Importante:
 
 - `local.properties` está ignorado por git.
 - No hardcodear ni commitear API keys.
-- Builds `release` requieren `BACKEND_BASE_URL_RELEASE` con URL HTTPS real.
+- Builds `release` y `bundleRelease` fallan si `BACKEND_BASE_URL_RELEASE` no es HTTPS real o apunta a localhost/placeholders.
+- También puedes inyectar `BACKEND_BASE_URL_RELEASE`, `APP_VERSION_CODE` y `APP_VERSION_NAME` por variables de entorno.
 
 ## 8. Ejecutar la app
 
@@ -180,11 +181,13 @@ Salida esperada:
 
 ```bash
 gradlew.bat :app:assembleRelease
+gradlew.bat :app:bundleRelease
 ```
 
 Salida esperada:
 
 - app/build/outputs/apk/release/app-release-unsigned.apk
+- app/build/outputs/bundle/release/app-release.aab
 
 Para subir a usuarios finales, firma el APK/AAB con keystore de release.
 
@@ -200,6 +203,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ```bash
 gradlew.bat :app:testDebugUnitTest
+node --test backend/ors-gateway.test.js
 ```
 
 Cobertura principal:
@@ -235,6 +239,8 @@ Uso:
 - Si el sol no está sobre el horizonte, se devuelve un mensaje específico de no-sol.
 - Si no hay datos solares suficientes, la recomendación puede pasar a fallback controlado.
 - El tipo de vehículo seleccionado se conserva vía SavedStateHandle.
+- Geocode y reverse geocode muestran feedback explícito si backend o red no están disponibles.
+- Release bloquea cleartext y deshabilita backup/data extraction.
 
 ## 13. Troubleshooting rápido
 
@@ -251,13 +257,23 @@ Uso:
 ### Errores de red intermitentes
 
 - La app ya aplica retry/backoff para transitorios (408, 429, 5xx, IO).
+- En release, errores TLS se muestran como fallo de conexión segura.
 
 ### No aparece recomendación clara
 
 - Puede ocurrir en fallback o cobertura solar baja.
 - Revisa mensaje de confianza y cobertura en UI.
 
-## 14. Guía para futuros desarrolladores y agentes de IA
+## 14. Documentación operativa
+
+- `docs/release/play-store-production-runbook.md`
+- `docs/release/open-testing-release-checklist.md`
+- `docs/release/smoke-checklist-backend-android.md`
+- `docs/backend/operations.md`
+- `docs/play-store/play-console-data-safety-draft.md`
+- `docs/play-store/privacy-policy-draft.md`
+
+## 15. Guía para futuros desarrolladores y agentes de IA
 
 ### Principios del proyecto
 

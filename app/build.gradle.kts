@@ -12,22 +12,42 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 
-val backendBaseUrlDebug = localProperties.getProperty(
-    "BACKEND_BASE_URL_DEBUG",
-    localProperties.getProperty("BACKEND_BASE_URL", "http://10.0.2.2:8081/")
+fun readConfig(name: String, defaultValue: String): String {
+    val envValue = System.getenv(name)?.trim().orEmpty()
+    if (envValue.isNotEmpty()) {
+        return envValue
+    }
+    return localProperties.getProperty(name, defaultValue).trim()
+}
+
+val placeholderReleaseHosts = listOf(
+    "your-backend.example.com",
+    "tu-backend-publico.com"
 )
 
-val backendBaseUrlRelease = localProperties.getProperty(
-    "BACKEND_BASE_URL_RELEASE",
-    "https://your-backend.example.com/"
+val backendBaseUrlDebug = readConfig(
+    "BACKEND_BASE_URL_DEBUG",
+    readConfig("BACKEND_BASE_URL", "http://10.0.2.2:8081/")
 )
+
+val backendBaseUrlRelease = readConfig(
+    "BACKEND_BASE_URL_RELEASE",
+    "https://tu-backend-publico.com/"
+)
+
+val appVersionCode = readConfig("APP_VERSION_CODE", "1").toIntOrNull()
+    ?: throw GradleException("APP_VERSION_CODE debe ser numerico.")
+val appVersionName = readConfig("APP_VERSION_NAME", "1.0.0")
 
 val releaseTasksRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
 if (releaseTasksRequested) {
     val invalidReleaseUrl =
         backendBaseUrlRelease.isBlank() ||
-            backendBaseUrlRelease.contains("your-backend.example.com", ignoreCase = true) ||
-            !backendBaseUrlRelease.startsWith("https://")
+            placeholderReleaseHosts.any { backendBaseUrlRelease.contains(it, ignoreCase = true) } ||
+            !backendBaseUrlRelease.startsWith("https://") ||
+            backendBaseUrlRelease.contains("10.0.2.2") ||
+            backendBaseUrlRelease.contains("localhost", ignoreCase = true) ||
+            backendBaseUrlRelease.contains("127.0.0.1")
 
     if (invalidReleaseUrl) {
         throw GradleException(
@@ -45,19 +65,22 @@ android {
         applicationId = "com.example.asombrate"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
             buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrlDebug\"")
         }
 
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrlRelease\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -75,6 +98,10 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    lint {
+        checkReleaseBuilds = true
+        abortOnError = true
     }
 }
 
@@ -94,6 +121,7 @@ dependencies {
 
     // Solar Calculation
     implementation("org.shredzone.commons:commons-suncalc:3.5")
+    implementation(libs.spotbugs.annotations)
 
     // Maps - OpenStreetMap
     implementation(libs.osmdroid)

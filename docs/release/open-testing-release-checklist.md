@@ -1,50 +1,43 @@
 # Open Testing Release Checklist - Asombrate
 
-Use this as a go/no-go checklist before publishing to Google Play Open Testing.
+Fecha: 2026-04-25
 
-## 1) Backend and endpoint configuration
+## Backend
 
-- [ ] BACKEND_BASE_URL in local/release config points to production-like HTTPS endpoint.
-- [ ] Backend env vars configured (at least ORS_API_KEY, quota/rate/caching values).
-- [ ] Backend health check and routing paths respond correctly: /directions, /geocode, /reverse-geocode.
+- [ ] `GET /healthz` responde `200`.
+- [ ] `GET /readyz` responde `200`.
+- [ ] `https://asombrate-backend.onrender.com` sigue siendo el backend release oficial.
+- [ ] `ORS_API_KEY` solo existe en backend.
 
-## 2) Security and secrets
+## Android release
 
-- [ ] ORS_API_KEY is only in backend environment, never in client app config/resources.
-- [ ] No credentials committed in repository history for release branch.
-- [ ] Release endpoint does not expose debug-only internals.
+- [ ] `BACKEND_BASE_URL_RELEASE` apunta a `https://asombrate-backend.onrender.com/`.
+- [ ] `APP_VERSION_CODE` incrementado para la nueva subida.
+- [ ] `gradlew.bat :app:testDebugUnitTest` pasa.
+- [ ] `gradlew.bat :app:assembleDebug` pasa.
+- [ ] `gradlew.bat :app:bundleRelease` pasa.
 
-## 3) Build artifacts
+## Seguridad y privacidad
 
-- [ ] Unit tests pass: gradlew.bat :app:testDebugUnitTest
-- [ ] Debug build passes: gradlew.bat :app:assembleDebug
-- [ ] Release bundle generated (if publishing): gradlew.bat :app:bundleRelease
-- [ ] Signing and Play App Signing workflow verified for upload.
+- [ ] Release usa HTTPS exclusivamente.
+- [ ] Release no permite cleartext.
+- [ ] Backup y data extraction siguen deshabilitados.
+- [ ] No hay secretos en `app/build`.
 
-## 4) Smoke test minimum
+## Smoke manual
 
-- [ ] Run manual smoke checklist in docs/release/smoke-checklist-backend-android.md
-- [ ] Confirm service state handling in app UI: NORMAL, HIGH_USAGE, DEGRADED, BLOCK, TEMP_UNAVAILABLE.
-- [ ] Confirm fallback behavior with last successful route remains functional.
+- [ ] Flujo feliz origen/destino/ruta/recomendación.
+- [ ] Ubicación actual.
+- [ ] Error de red visible y entendible en geocode/reverse geocode.
+- [ ] Estados `HIGH_USAGE`, `DEGRADED`, `BLOCK` validados.
 
-## 5) Privacy and Play documentation
+## Play Console
 
-- [ ] docs/play-store/privacy-audit-open-testing.md reviewed and still accurate.
-- [ ] docs/play-store/privacy-policy-draft.md updated with final contact and effective date.
-- [ ] docs/play-store/play-console-data-safety-draft.md answers copied/validated in Play Console.
+- [ ] Data Safety copiada desde `docs/play-store/play-console-data-safety-draft.md`.
+- [ ] Política de privacidad final publicada con correo real.
+- [ ] Screenshots y listing actualizados.
 
-## 6) Store listing assets (manual)
+## Go / No-Go
 
-- [ ] App icon, feature graphic, screenshots updated.
-- [ ] Short and full descriptions aligned with real functionality.
-- [ ] Privacy policy URL/document location ready for Play submission.
-
-## 7) CI gate
-
-- [ ] CI workflow passes on latest commit (assembleDebug + testDebugUnitTest).
-- [ ] Any CI red status is blocking for release.
-
-## 8) Go / No-Go decision
-
-- [ ] GO: all mandatory checks above passed.
-- [ ] NO-GO: at least one mandatory check failed; release postponed.
+- [ ] GO.
+- [ ] NO-GO si falla cualquiera de los bloques anteriores.
